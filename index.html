@@ -498,43 +498,100 @@
   // ---------------------------------------------------------
   // Auth screen
   // ---------------------------------------------------------
-  var authMode = 'signin'; // 'signin' | 'signup'
+  var authMode = 'signin'; // 'signin' | 'signup' | 'reset'
   var authError = '';
+  var authMessage = '';
   var authBusy = false;
+  var authEmailDraft = ''; // carries the typed email across re-renders/mode switches
 
   function renderAuthScreen(){
     var el = document.getElementById('authScreen');
     var html = '<div class="auth-wrap add-card">';
-    html += '<h3>' + (authMode === 'signin' ? 'Sign in' : 'Create your account') + '</h3>';
-    html += '<p class="hint-text" style="margin-top:0;">Sign in with the same email and password on every device to keep your people, groups, and calendar in sync.</p>';
-    html += '<form id="authForm">';
-    html += '<input type="email" id="authEmail" placeholder="Email" autocomplete="username" required />';
-    html += '<input type="password" id="authPassword" placeholder="Password (6+ characters)" autocomplete="' + (authMode === 'signin' ? 'current-password' : 'new-password') + '" minlength="6" required />';
-    html += '<button type="submit" class="primary-btn" ' + (authBusy ? 'disabled' : '') + '>' +
-      (authBusy ? 'Please wait...' : (authMode === 'signin' ? 'Sign in' : 'Create account')) + '</button>';
-    html += '</form>';
+
+    if(authMode === 'reset'){
+      html += '<h3>Reset your password</h3>';
+      html += '<p class="hint-text" style="margin-top:0;">Enter your account email and we\'ll send you a link to set a new password.</p>';
+      html += '<form id="authForm">';
+      html += '<input type="email" id="authEmail" placeholder="Email" autocomplete="username" value="'+escapeHtml(authEmailDraft)+'" required />';
+      html += '<button type="submit" class="primary-btn" ' + (authBusy ? 'disabled' : '') + '>' +
+        (authBusy ? 'Sending...' : 'Send reset email') + '</button>';
+      html += '</form>';
+    } else {
+      html += '<h3>' + (authMode === 'signin' ? 'Sign in' : 'Create your account') + '</h3>';
+      html += '<p class="hint-text" style="margin-top:0;">Sign in with the same email and password on every device to keep your people, groups, and calendar in sync.</p>';
+      html += '<form id="authForm">';
+      html += '<input type="email" id="authEmail" placeholder="Email" autocomplete="username" value="'+escapeHtml(authEmailDraft)+'" required />';
+      html += '<input type="password" id="authPassword" placeholder="Password (6+ characters)" autocomplete="' + (authMode === 'signin' ? 'current-password' : 'new-password') + '" minlength="6" required />';
+      html += '<button type="submit" class="primary-btn" ' + (authBusy ? 'disabled' : '') + '>' +
+        (authBusy ? 'Please wait...' : (authMode === 'signin' ? 'Sign in' : 'Create account')) + '</button>';
+      html += '</form>';
+    }
+
     if(authError){ html += '<p class="hint-text" style="color:var(--danger);">' + escapeHtml(authError) + '</p>'; }
-    html += '<div class="auth-toggle">';
+    if(authMessage){ html += '<p class="hint-text" style="color:var(--accent);">' + escapeHtml(authMessage) + '</p>'; }
+
+    html += '<div class="auth-toggle" style="flex-direction:column;align-items:flex-start;gap:8px;">';
     if(authMode === 'signin'){
       html += '<button type="button" class="link-btn" id="authSwitchMode">First time? Create an account</button>';
-    } else {
+      html += '<button type="button" class="link-btn" id="authForgotPassword">Forgot password?</button>';
+    } else if(authMode === 'signup'){
       html += '<button type="button" class="link-btn" id="authSwitchMode">Already have an account? Sign in</button>';
+    } else { // reset
+      html += '<button type="button" class="link-btn" id="authBackToSignin">&larr; Back to sign in</button>';
     }
     html += '</div></div>';
     el.innerHTML = html;
     el.style.display = 'block';
     document.getElementById('app').style.display = 'none';
 
-    document.getElementById('authSwitchMode').addEventListener('click', function(){
-      authMode = (authMode === 'signin') ? 'signup' : 'signin';
-      authError = '';
-      renderAuthScreen();
-    });
+    var switchBtn = document.getElementById('authSwitchMode');
+    if(switchBtn){
+      switchBtn.addEventListener('click', function(){
+        authMode = (authMode === 'signin') ? 'signup' : 'signin';
+        authError = ''; authMessage = '';
+        renderAuthScreen();
+      });
+    }
+    var forgotBtn = document.getElementById('authForgotPassword');
+    if(forgotBtn){
+      forgotBtn.addEventListener('click', function(){
+        authEmailDraft = document.getElementById('authEmail').value.trim();
+        authMode = 'reset';
+        authError = ''; authMessage = '';
+        renderAuthScreen();
+      });
+    }
+    var backBtn = document.getElementById('authBackToSignin');
+    if(backBtn){
+      backBtn.addEventListener('click', function(){
+        authMode = 'signin';
+        authError = ''; authMessage = '';
+        renderAuthScreen();
+      });
+    }
     document.getElementById('authForm').addEventListener('submit', function(e){
       e.preventDefault();
       var email = document.getElementById('authEmail').value.trim();
+      authEmailDraft = email;
+      authError = ''; authMessage = '';
+
+      if(authMode === 'reset'){
+        authBusy = true;
+        renderAuthScreen();
+        fbAuth.sendPasswordResetEmail(email).then(function(){
+          authBusy = false;
+          authMode = 'signin';
+          authMessage = 'Reset email sent. Check your inbox (and spam folder), then sign in with your new password.';
+          renderAuthScreen();
+        }).catch(function(err){
+          authBusy = false;
+          authError = err && err.message ? err.message : 'Could not send reset email. Try again.';
+          renderAuthScreen();
+        });
+        return;
+      }
+
       var password = document.getElementById('authPassword').value;
-      authError = '';
       authBusy = true;
       renderAuthScreen();
       var action = (authMode === 'signin')
