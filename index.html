@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mariel's Application</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#D6336C" />
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Mariel's App" />
+<style>
+  :root{
+    --paper: #F8E3EC;
+    --card: #FFFAFC;
+    --ink: #2E2A22;
+    --muted: #8A6472;
+    --line: #E4B9CC;
+    --accent: #D6336C;
+    --accent-contrast: #FFF7FA;
+    --accent-soft: #F4C6DA;
+    --danger: #8C3A2B;
+    --radius: 10px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .page{ max-width: 480px; margin: 0 auto; padding: 22px 18px 40px; }
+
+  .page-head h1{
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    font-size: 23px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: var(--ink);
+  }
+  .page-head .sub{
+    margin: 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    max-width: 34ch;
+  }
+
+  #banner{ margin-top: 14px; }
+  .banner{
+    background: #F4E3DC;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    display:flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .banner button{
+    background:none; border:none; color:var(--danger); font-size:13px;
+    text-decoration: underline; cursor:pointer; padding:0; flex-shrink:0;
+  }
+
+  /* Tab bar */
+  .tab-bar{
+    display:flex; gap:4px; margin: 18px 0 6px;
+    background: var(--card); border-radius: 999px; padding: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .tab-btn{
+    flex:1; border:none; background:none; padding: 9px 6px;
+    border-radius: 999px; font: 13.5px -apple-system, sans-serif; font-weight:600;
+    color: var(--muted); cursor:pointer;
+  }
+  .tab-btn.active{ background: var(--accent); color: var(--accent-contrast); }
+
+  .section-headrow{
+    display:flex; justify-content:space-between; align-items:center;
+    margin: 22px 0 8px;
+  }
+  .section-headrow .section-title{ margin:0; }
+
+  .section-title{
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 26px 0 8px;
+  }
+  .section-title:first-of-type{ margin-top: 20px; }
+
+  .empty-state{
+    padding: 18px 2px 22px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* Avatars */
+  .avatar{
+    display:inline-flex; align-items:center; justify-content:center;
+    border-radius:50%; overflow:hidden; flex-shrink:0;
+    background: var(--accent-soft); border: 2px solid var(--accent);
+    color: var(--accent); font-family: Georgia, serif; font-weight:600;
+  }
+  .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .avatar-label{ cursor:pointer; display:inline-block; }
+
+  /* People list */
+  .person-list{ list-style:none; margin:0; padding:0; }
+  .person-row{ border-bottom: 1px solid var(--line); }
+  .person-row:first-child{ border-top: 1px solid var(--line); }
+  .person-head{
+    width:100%; display:flex; align-items:center; gap:10px;
+    background:none; border:none; text-align:left; padding: 12px 2px;
+    cursor:pointer; font: inherit; color: inherit;
+  }
+  .person-name{ flex:1; font-size: 15px; font-weight:500; }
+  .person-status{ font-size: 12px; color: var(--danger); flex-shrink:0; }
+
+  .chevron{
+    display:inline-block; color: var(--muted); font-size: 15px;
+    transition: transform .18s ease; flex-shrink:0;
+  }
+  .chevron.open{ transform: rotate(90deg); }
+
+  .person-panel, .group-panel{
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin: 0 2px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .panel-manage{
+    display:flex; justify-content: space-between; align-items:center; margin-bottom: 10px;
+  }
+  .link-btn{
+    background:none; border:none; cursor:pointer; padding:2px 0;
+    font: 13px -apple-system, sans-serif; color: var(--accent);
+  }
+  .link-btn.danger{ color: var(--danger); }
+  .link-btn:hover{ text-decoration: underline; }
+  .link-btn:disabled{ opacity:.45; cursor:not-allowed; text-decoration:none; }
+
+  .field-label{ display:block; font-size: 12.5px; color: var(--muted); margin: 12px 0 6px; }
+  .field-label:first-of-type{ margin-top: 4px; }
+
+  textarea, input[type="text"], input[type="time"], select{
+    width:100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font: 14px -apple-system, sans-serif;
+    color: var(--ink);
+    background: #fff;
+  }
+  textarea{ resize: vertical; font-family: inherit; }
+  textarea:focus, input:focus, select:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .primary-btn{
+    margin-top: 10px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border:none; border-radius: var(--radius);
+    padding: 10px 16px;
+    font: 14px -apple-system, sans-serif; font-weight: 600;
+    cursor:pointer;
+  }
+  .primary-btn:disabled{ background: var(--line); color: var(--muted); cursor:not-allowed; }
+
+  .photo-edit{ display:flex; align-items:center; gap:14px; margin: 4px 0 14px; }
+  .photo-actions{ display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+
+  .person-edit-form{ display:flex; flex-direction:column; }
+  .person-edit-form input{ margin-bottom: 8px; }
+  .person-edit-form button{
+    align-self:flex-start; background:var(--accent); color:var(--accent-contrast);
+    border:none; border-radius:8px; padding:8px 14px; font:13.5px sans-serif; cursor:pointer;
+  }
+  .link-preview{ font-size:13px; color:var(--muted); word-break:break-all; margin:0; }
+
+  .contacts{ margin-top: 6px; }
+  .contact-row{
+    display:flex; align-items:center; gap: 10px; padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .contact-row:last-child{ border-bottom:none; }
+  .contact-name{ flex:1; font-size: 14px; }
+  .contact-row.sent .contact-name{ text-decoration: line-through; color: var(--muted); }
+  .sent-check{
+    flex-shrink:0; width:18px; height:18px; accent-color: var(--accent); cursor:pointer;
+  }
+  .pill-btn{
+    display:inline-block; background: var(--accent); color: var(--accent-contrast);
+    font-size: 12.5px; padding: 6px 12px; border-radius: 999px; text-decoration:none; flex-shrink:0;
+    border:none; cursor:pointer; font-family: -apple-system, sans-serif;
+  }
+  .pill-btn.disabled{ background: var(--line); color: var(--muted); cursor:not-allowed; }
+  .icon-btn{
+    background:none; border:none; cursor:pointer; color: var(--muted);
+    font-size: 12.5px; padding: 4px; flex-shrink:0;
+  }
+  .icon-btn:hover{ color: var(--danger); }
+
+  /* Progress bar */
+  .progress-label{ font-size: 12.5px; color: var(--muted); margin: 0 0 6px; display:flex; justify-content:space-between; gap:8px; }
+  .progress-label .badge-complete{ color: var(--accent); font-weight:600; }
+  .progress-track{
+    width:100%; height:7px; background: var(--line); border-radius:999px; overflow:hidden; margin: 0 0 12px;
+  }
+  .progress-fill{ height:100%; background: var(--accent); border-radius:999px; transition: width .2s ease; }
+
+  .checklist-actions{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center; }
+  .checklist-actions .primary-btn{ margin-top:0; }
+  .checklist-actions .link-btn{ padding: 10px 4px; }
+
+  .hint-text{ font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  .member-picker{ margin-top: 4px; }
+  .add-member-form{ display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap; }
+  .add-member-form select{ flex:1; min-width:0; }
+  .add-member-form button{
+    background: var(--accent); color: var(--accent-contrast); border:none;
+    border-radius: 8px; padding: 9px 14px; font: 13.5px sans-serif; font-weight:600;
+    cursor:pointer; flex-shrink:0;
+  }
+
+  .add-card{
+    margin-top: 16px; padding: 16px; background: var(--card);
+    border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  .add-card h3{
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    font-size: 15px; font-weight: 600; margin: 0 0 10px;
+  }
+  .add-card form{ display:flex; flex-direction:column; gap:8px; }
+  .add-card > form > button{
+    align-self:flex-start; background: var(--accent); color: var(--accent-contrast);
+    border:none; border-radius: 8px; padding: 9px 16px; font: 13.5px sans-serif;
+    font-weight:600; cursor:pointer;
+  }
+
+  .group-list, .month-list{ list-style:none; margin: 0; padding:0; }
+  .group-row, .month-row{ border-bottom: 1px solid var(--line); }
+  .group-row:first-child, .month-row:first-child{ border-top: 1px solid var(--line); }
+  .group-head, .month-head{
+    width:100%; display:flex; align-items:center; gap: 10px;
+    background:none; border:none; text-align:left; padding: 15px 2px; cursor:pointer; font: inherit; color: inherit;
+  }
+  .group-name, .month-name{
+    flex:1; font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    font-size: 17px; font-weight: 500;
+  }
+  .group-count, .month-count{ font-size: 12.5px; color: var(--muted); flex-shrink:0; text-align:right; }
+  .group-count .complete-tag{ color: var(--accent); font-weight:600; }
+
+  .rename-form{ display:flex; gap:8px; flex:1; margin-right: 10px; }
+  .rename-form input{ flex:1; }
+  .rename-form button{
+    background: var(--accent); color:var(--accent-contrast); border:none;
+    border-radius: 8px; padding: 8px 12px; font-size:13px; cursor:pointer; flex-shrink:0;
+  }
+
+  .page-foot{ margin-top: 26px; }
+
+  /* Calendar */
+  .month-nav{ display:flex; align-items:center; justify-content:center; gap:18px; margin: 12px 0 14px; }
+  .month-nav-btn{
+    background: var(--accent-soft); color: var(--accent); border:none;
+    width:32px; height:32px; border-radius:50%; font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .month-nav-btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .month-label{ font-family: Georgia, serif; font-size: 17px; font-weight:600; min-width:150px; text-align:center; }
+
+  .calendar-grid{
+    display:grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin: 4px 2px 6px;
+  }
+  .calendar-weekday{
+    font-size: 10.5px; font-weight:700; color: var(--muted); text-align:center; padding-bottom: 2px;
+    letter-spacing: .02em;
+  }
+  .calendar-cell{
+    aspect-ratio: 1 / 1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius: 8px; background:#fff; border: 1px solid var(--line); cursor:pointer;
+    position:relative; font: inherit; color: inherit; padding: 2px; min-width:0;
+  }
+  .calendar-cell.empty{ visibility:hidden; pointer-events:none; border:none; background:none; }
+  .calendar-cell .cell-day{ font-size: 13px; font-weight:600; }
+  .calendar-cell.is-today{ border-color: var(--accent); border-width:2px; background: var(--accent-soft); }
+  .calendar-cell.is-selected{ background: var(--accent); border-color: var(--accent); }
+  .calendar-cell.is-selected .cell-day{ color: var(--accent-contrast); }
+  .calendar-cell.is-selected.is-today{ border-color: var(--accent-contrast); }
+  .cell-dot{
+    width:5px; height:5px; border-radius:50%; background: var(--accent); position:absolute; bottom:5px;
+  }
+  .calendar-cell.is-selected .cell-dot{ background: var(--accent-contrast); }
+  .cell-alarm{ font-size: 8px; position:absolute; top:3px; right:4px; line-height:1; }
+
+  .calendar-legend{ display:flex; gap:16px; font-size:11.5px; color: var(--muted); margin: 6px 2px 4px; }
+  .calendar-legend .legend-dot{
+    display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent); margin-right:5px; vertical-align:middle;
+  }
+  .calendar-legend .legend-today{
+    display:inline-block; width:9px; height:9px; border-radius:2px; border:2px solid var(--accent); margin-right:5px; vertical-align:middle;
+  }
+
+  .calendar-editor{ margin-top: 14px; }
+
+  /* To-Do */
+  .flag-btn{
+    background:none; border:none; cursor:pointer; font-size:15px; padding:4px;
+    flex-shrink:0; opacity:.32; filter:grayscale(1);
+  }
+  .flag-btn.active{ opacity:1; filter:none; }
+  .list-flag{ color: var(--danger); font-size: 13px; margin-left: 4px; }
+  .contact-row.urgent{ border-left: 3px solid var(--danger); padding-left: 7px; margin-left: -10px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-head">
+    <h1>Mariel's Application</h1>
+    <p class="sub">&ldquo;Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go.&rdquo;<br>Joshua 1:9</p>
+  </header>
+
+  <div id="banner"></div>
+  <div id="app"></div>
+</div>
+
+<script>
+(function(){
+  // Standalone storage shim: this app was originally built to run inside
+  // Claude's Artifact sandbox, which injects a `window.storage` object backed
+  // by Anthropic's servers. That object does not exist in a normal browser,
+  // a hosted web page, or an Android WebView shell, so outside of Claude.ai
+  // every save/load call would fail. This shim reimplements the same
+  // get/set/delete/list interface on top of localStorage, which is available
+  // everywhere (including inside an Android WebView APK). If real
+  // window.storage IS present (i.e. you're still running this inside a
+  // Claude artifact), it's left alone and takes priority.
+  if (!window.storage) {
+    window.storage = {
+      get: function(key){
+        return new Promise(function(resolve, reject){
+          try{
+            var v = localStorage.getItem(key);
+            if(v === null){ resolve(null); return; }
+            resolve({ key: key, value: v, shared: false });
+          }catch(e){ reject(e); }
+        });
+      },
+      set: function(key, value){
+        return new Promise(function(resolve, reject){
+          try{
+            localStorage.setItem(key, value);
+            resolve({ key: key, value: value, shared: false });
+          }catch(e){ reject(e); }
+        });
+      },
+      delete: function(key){
+        return new Promise(function(resolve){
+          try{ localStorage.removeItem(key); }catch(e){}
+          resolve({ key: key, deleted: true, shared: false });
+        });
+      },
+      list: function(prefix){
+        return new Promise(function(resolve){
+          var keys = [];
+          for(var i=0;i<localStorage.length;i++){
+            var k = localStorage.key(i);
+            if(!prefix || k.indexOf(prefix) === 0) keys.push(k);
+          }
+          resolve({ keys: keys, prefix: prefix, shared: false });
+        });
+      }
+    };
+  }
+
+  var STORAGE_PEOPLE_KEY = 'people-data-v2';
+  var STORAGE_GROUPS_KEY = 'groups-data-v2';
+  var STORAGE_CALENDAR_KEY = 'calendar-data-v1';
+  var STORAGE_TODO_KEY = 'todo-data-v1';
+
+  var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  var peopleState = { people: [] };
+  var groupsState = { groups: [] };
+  var calendarState = { entries: {} }; // key 'YYYY-MM-DD' -> { note: '', alarm: '' }
+  var todoState = { lists: [] }; // { id, name, urgent, notes: [ { id, text, done, urgent } ] }
+
+  var today = new Date();
+  var CURRENT_YEAR = today.getFullYear();
+  var CURRENT_MONTH = today.getMonth();
+  var CURRENT_DATE = today.getDate();
+
+  var uiState = {
+    activeTab: 'messages', // 'messages' | 'calendar' | 'todo'
+    expandedPersonId: null, editingPersonId: null, pendingDeletePersonId: null,
+    expandedGroupId: null, renamingGroupId: null, pendingDeleteGroupId: null,
+    pendingClearAll: false, copiedGroupId: null, quickCopied: false,
+    calYear: CURRENT_YEAR, calMonth: CURRENT_MONTH, calExpandedDate: null,
+    expandedListId: null, renamingListId: null, pendingDeleteListId: null, pendingDeleteNoteId: null
+  };
+  var pendingDeletePersonTimeout = null;
+  var pendingDeleteGroupTimeout = null;
+  var pendingDeleteListTimeout = null;
+  var pendingDeleteNoteTimeout = null;
+  var pendingClearTimeout = null;
+  var copiedTimeout = null;
+  var quickCopiedTimeout = null;
+  var quickMessageDraft = '';
+  var alarmTimers = {}; // dateKey -> timeout id, for same-session alarm firing
+
+  function genId(prefix){
+    return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  function escapeHtml(str){
+    return String(str || '').replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  // Normalizes anything a user might paste (a bare username, an @handle,
+  // a m.me link, a messenger.com/t/ link, or a full facebook.com/fb.com
+  // profile link) into a canonical https://m.me/<id> link. Routing
+  // everything through m.me consistently is what lets openMessengerHref()
+  // below reliably force-launch the Messenger app instead of whatever
+  // app Android last used to handle a facebook.com link (often Facebook
+  // Lite, which also registers a handler for these links).
+  function normalizeLink(input){
+    input = (input || '').trim();
+    if(!input) return '';
+    var fbMatch = input.match(/^https?:\/\/(www\.)?(m\.me|messenger\.com\/t|facebook\.com|fb\.com)\/([^/?#]+)/i);
+    if(fbMatch){
+      return 'https://m.me/' + fbMatch[3];
+    }
+    if(/^https?:\/\//i.test(input)) return input;
+    input = input.replace(/^@/, '').replace(/^m\.me\//i, '').replace(/^messenger\.com\/t\//i, '');
+    return 'https://m.me/' + input;
+  }
+
+  // Opens a saved Messenger link so it actually lands in the Messenger
+  // app's DM thread instead of getting intercepted by Facebook Lite (which
+  // registers its own handler for m.me / facebook.com links on Android,
+  // and can end up as the OS's chosen default for them).
+  //
+  // On Android we route through an `intent://` URL with an explicit
+  // `package=com.facebook.orca` (Messenger's Android package name). That
+  // tells Android "open this with Messenger specifically," bypassing
+  // whatever app is currently set as default for these links entirely.
+  // If Messenger isn't installed, S.browser_fallback_url sends it to the
+  // normal https link instead. iOS doesn't have this ambiguity problem
+  // (m.me is a verified Universal Link straight to Messenger there), so
+  // we leave it as a plain link on iOS/desktop.
+  function openMessengerHref(link){
+    if(!link) return;
+    var isAndroid = /Android/i.test(navigator.userAgent || '');
+    if(isAndroid){
+      try{
+        var url = new URL(link);
+        var target = url.hostname + url.pathname + url.search;
+        var fallback = encodeURIComponent(link);
+        var intentUrl = 'intent://' + target +
+          '#Intent;package=com.facebook.orca;scheme=' + (url.protocol.replace(':','')) +
+          ';S.browser_fallback_url=' + fallback + ';end';
+        window.location.href = intentUrl;
+        return;
+      }catch(e){ /* fall through to plain link below */ }
+    }
+    window.open(link, '_blank', 'noopener');
+  }
+
+  function copyToClipboard(text){
+    return new Promise(function(resolve, reject){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(resolve).catch(reject);
+        return;
+      }
+      try{
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        resolve();
+      }catch(err){ reject(err); }
+    });
+  }
+
+  function showBanner(message){
+    var banner = document.getElementById('banner');
+    banner.innerHTML = '<div class="banner"><span>' + escapeHtml(message) + '</span>' +
+      '<button data-action="dismiss-banner">Dismiss</button></div>';
+  }
+  function clearBanner(){ document.getElementById('banner').innerHTML = ''; }
+
+  async function loadPeople(){
+    try{
+      var res = await window.storage.get(STORAGE_PEOPLE_KEY, false);
+      if(res && res.value){
+        var parsed = JSON.parse(res.value);
+        if(parsed && Array.isArray(parsed.people)) return parsed;
+      }
+    }catch(e){ /* no saved data yet */ }
+    return { people: [] };
+  }
+  async function loadGroups(){
+    try{
+      var res = await window.storage.get(STORAGE_GROUPS_KEY, false);
+      if(res && res.value){
+        var parsed = JSON.parse(res.value);
+        if(parsed && Array.isArray(parsed.groups)){
+          parsed.groups.forEach(function(g){
+            if(!Array.isArray(g.memberIds)) g.memberIds = [];
+            if(typeof g.message !== 'string') g.message = '';
+            if(!Array.isArray(g.sentIds)) g.sentIds = [];
+            if(typeof g.completed !== 'boolean') g.completed = false;
+          });
+          return parsed;
+        }
+      }
+    }catch(e){ /* no saved data yet */ }
+    return { groups: [] };
+  }
+  async function loadCalendar(){
+    try{
+      var res = await window.storage.get(STORAGE_CALENDAR_KEY, false);
+      if(res && res.value){
+        var parsed = JSON.parse(res.value);
+        if(parsed && typeof parsed.entries === 'object' && parsed.entries !== null) return parsed;
+      }
+    }catch(e){ /* no saved data yet */ }
+    return { entries: {} };
+  }
+  async function loadTodo(){
+    try{
+      var res = await window.storage.get(STORAGE_TODO_KEY, false);
+      if(res && res.value){
+        var parsed = JSON.parse(res.value);
+        if(parsed && Array.isArray(parsed.lists)){
+          parsed.lists.forEach(function(l){
+            if(!Array.isArray(l.notes)) l.notes = [];
+            if(typeof l.urgent !== 'boolean') l.urgent = false;
+            l.notes.forEach(function(n){
+              if(typeof n.done !== 'boolean') n.done = false;
+              if(typeof n.urgent !== 'boolean') n.urgent = false;
+            });
+          });
+          return parsed;
+        }
+        // Migrate the old flat "items" format into a single default list.
+        if(parsed && Array.isArray(parsed.items)){
+          if(parsed.items.length === 0) return { lists: [] };
+          return { lists: [{
+            id: genId('tlist'), name: 'My List', urgent: false,
+            notes: parsed.items.map(function(it){
+              return { id: it.id || genId('note'), text: it.text || '', done: !!it.done, urgent: false };
+            })
+          }] };
+        }
+      }
+    }catch(e){ /* no saved data yet */ }
+    return { lists: [] };
+  }
+
+  async function savePeople(){
+    try{ await window.storage.set(STORAGE_PEOPLE_KEY, JSON.stringify(peopleState), false); }
+    catch(e){ showBanner("Couldn't save your changes. Check your connection and try again."); }
+  }
+  async function saveGroups(){
+    try{ await window.storage.set(STORAGE_GROUPS_KEY, JSON.stringify(groupsState), false); }
+    catch(e){ showBanner("Couldn't save your changes. Check your connection and try again."); }
+  }
+  async function saveCalendar(){
+    try{ await window.storage.set(STORAGE_CALENDAR_KEY, JSON.stringify(calendarState), false); }
+    catch(e){ showBanner("Couldn't save your changes. Check your connection and try again."); }
+  }
+  async function saveTodo(){
+    try{ await window.storage.set(STORAGE_TODO_KEY, JSON.stringify(todoState), false); }
+    catch(e){ showBanner("Couldn't save your changes. Check your connection and try again."); }
+  }
+
+  function findPerson(id){
+    for(var i=0;i<peopleState.people.length;i++){ if(peopleState.people[i].id===id) return peopleState.people[i]; }
+    return null;
+  }
+  function findGroup(id){
+    for(var i=0;i<groupsState.groups.length;i++){ if(groupsState.groups[i].id===id) return groupsState.groups[i]; }
+    return null;
+  }
+  function findTodoList(id){
+    for(var i=0;i<todoState.lists.length;i++){ if(todoState.lists[i].id===id) return todoState.lists[i]; }
+    return null;
+  }
+  function findTodoNoteRefs(listId, noteId){
+    var list = findTodoList(listId);
+    if(!list) return null;
+    for(var i=0;i<list.notes.length;i++){
+      if(list.notes[i].id === noteId) return { list: list, note: list.notes[i] };
+    }
+    return null;
+  }
+
+  function loadAndResizeImage(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        var img = new Image();
+        img.onload = function(){
+          var size = 240;
+          var canvas = document.createElement('canvas');
+          canvas.width = size; canvas.height = size;
+          var ctx = canvas.getContext('2d');
+          var srcSize = Math.min(img.width, img.height);
+          var sx = (img.width - srcSize) / 2;
+          var sy = (img.height - srcSize) / 2;
+          ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, size, size);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = function(){ reject(new Error('bad image')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function(){ reject(new Error('bad file')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderAvatar(person, sizePx){
+    var style = 'width:'+sizePx+'px;height:'+sizePx+'px;font-size:'+Math.round(sizePx*0.42)+'px;';
+    if(person.photo){
+      return '<span class="avatar" style="'+style+'"><img src="'+person.photo+'" alt="" /></span>';
+    }
+    var initial = (person.name || '?').trim().charAt(0).toUpperCase() || '?';
+    return '<span class="avatar" style="'+style+'">'+escapeHtml(initial)+'</span>';
+  }
+
+  // ---------- Calendar helpers ----------
+  function dateKey(year, monthIdx, day){
+    return year + '-' + pad2(monthIdx + 1) + '-' + pad2(day);
+  }
+  function daysInMonth(year, monthIdx){
+    return new Date(year, monthIdx + 1, 0).getDate();
+  }
+  function getCalEntry(key){
+    return calendarState.entries[key] || { note: '', alarm: '' };
+  }
+  function monthNoteCount(year, monthIdx){
+    var prefix = year + '-' + pad2(monthIdx + 1) + '-';
+    var count = 0;
+    Object.keys(calendarState.entries).forEach(function(k){
+      if(k.indexOf(prefix) === 0){
+        var e = calendarState.entries[k];
+        if((e.note && e.note.trim()) || e.alarm) count++;
+      }
+    });
+    return count;
+  }
+  function formatTime12(t){
+    if(!t) return '';
+    var parts = t.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + ':' + m + ' ' + ampm;
+  }
+  function formatDateHeading(year, monthIdx, day){
+    return MONTH_NAMES[monthIdx] + ' ' + day + ', ' + year;
+  }
+
+  // Best-effort alarm: while this tab/app is open, if today has an alarm
+  // time still ahead of us, schedule a browser notification for it. This
+  // cannot wake a closed app or a killed browser tab -- there's no reliable
+  // way to do that from a plain web page/PWA -- but it will fire while the
+  // app is open or backgrounded in a tab.
+  function scheduleTodaysAlarms(){
+    Object.keys(alarmTimers).forEach(function(k){ clearTimeout(alarmTimers[k]); });
+    alarmTimers = {};
+    var todayKey = dateKey(CURRENT_YEAR, CURRENT_MONTH, CURRENT_DATE);
+    var entry = calendarState.entries[todayKey];
+    if(!entry || !entry.alarm) return;
+    var parts = entry.alarm.split(':');
+    var target = new Date();
+    target.setHours(parseInt(parts[0],10), parseInt(parts[1],10), 0, 0);
+    var msUntil = target.getTime() - Date.now();
+    if(msUntil <= 0) return;
+    alarmTimers[todayKey] = setTimeout(function(){
+      var body = entry.note && entry.note.trim() ? entry.note : 'You set an alarm for today.';
+      if('Notification' in window && Notification.permission === 'granted'){
+        try{ new Notification('Reminder', { body: body }); }catch(e){}
+      } else {
+        showBanner('Reminder: ' + body);
+      }
+    }, msUntil);
+  }
+
+  function render(){
+    var root = document.getElementById('app');
+    var html = '';
+
+    html += '<nav class="tab-bar">';
+    html += '<button type="button" class="tab-btn'+(uiState.activeTab==='messages'?' active':'')+'" data-action="switch-tab" data-tab="messages">Messages</button>';
+    html += '<button type="button" class="tab-btn'+(uiState.activeTab==='calendar'?' active':'')+'" data-action="switch-tab" data-tab="calendar">Calendar</button>';
+    html += '<button type="button" class="tab-btn'+(uiState.activeTab==='todo'?' active':'')+'" data-action="switch-tab" data-tab="todo">To-Do</button>';
+    html += '</nav>';
+
+    if(uiState.activeTab === 'calendar'){
+      html += renderCalendarTab();
+    } else if(uiState.activeTab === 'todo'){
+      html += renderTodoTab();
+    } else {
+      html += renderMessagesTab();
+    }
+
+    root.innerHTML = html;
+
+    if(uiState.editingPersonId){
+      var i1 = document.getElementById('pname-'+uiState.editingPersonId);
+      if(i1) i1.focus();
+    }
+    if(uiState.renamingGroupId){
+      var i2 = root.querySelector('.rename-form input');
+      if(i2){ i2.focus(); i2.select(); }
+    }
+  }
+
+  function renderMessagesTab(){
+    var html = '';
+
+    html += '<div class="add-card">';
+    html += '<h3>Quick message</h3>';
+    html += '<p class="hint-text">For a one-off note outside your saved groups. Copying it clears the box automatically.</p>';
+    html += '<textarea id="quickMessage" rows="3" data-action="edit-quick-message" placeholder="Type a message to copy and send">'+escapeHtml(quickMessageDraft)+'</textarea>';
+    var quickHasText = quickMessageDraft.trim().length > 0;
+    html += '<button type="button" class="primary-btn" data-action="quick-copy" '+(quickHasText?'':'disabled')+'>'+(uiState.quickCopied?'Copied':'Copy')+'</button>';
+    html += '</div>';
+
+    html += '<h2 class="section-title">Groups</h2>';
+    if(groupsState.groups.length === 0){
+      html += '<p class="empty-state">No groups yet. Add one below to get started.</p>';
+    } else {
+      html += '<ul class="group-list">';
+      groupsState.groups.forEach(function(g){
+        var expanded = uiState.expandedGroupId === g.id;
+        var count = g.memberIds.length;
+        var sentCount = g.sentIds.length;
+
+        html += '<li class="group-row">';
+        html += '<button type="button" class="group-head" data-action="toggle-group" data-id="'+g.id+'">';
+        html += '<span class="chevron'+(expanded?' open':'')+'">&#8250;</span>';
+        html += '<span class="group-name">'+escapeHtml(g.name)+'</span>';
+        html += '<span class="group-count">'+count+' '+(count===1?'person':'people')+
+          (g.completed ? '<br><span class="complete-tag">Marked complete</span>' : (count>0 ? '<br>'+sentCount+'/'+count+' sent' : ''))+'</span>';
+        html += '</button>';
+
+        if(expanded){
+          html += '<div class="group-panel">';
+          html += '<div class="panel-manage">';
+          if(uiState.renamingGroupId === g.id){
+            html += '<form class="rename-form" data-action="confirm-rename" data-id="'+g.id+'">';
+            html += '<input type="text" name="rename" value="'+escapeHtml(g.name)+'" />';
+            html += '<button type="submit">Save</button></form>';
+          } else {
+            html += '<button type="button" class="link-btn" data-action="start-rename" data-id="'+g.id+'">Rename</button>';
+          }
+          var pendingDelG = uiState.pendingDeleteGroupId === g.id;
+          html += '<button type="button" class="link-btn danger" data-action="request-delete-group" data-id="'+g.id+'">'+
+            (pendingDelG ? 'Tap again to delete' : 'Delete group')+'</button>';
+          html += '</div>';
+
+          html += '<label class="field-label" for="msg-'+g.id+'">Message</label>';
+          html += '<textarea id="msg-'+g.id+'" rows="4" data-action="edit-message" data-id="'+g.id+'" placeholder="Type the message you want to send this group">'+escapeHtml(g.message)+'</textarea>';
+
+          var hasMessage = (g.message || '').trim().length > 0;
+          var copied = uiState.copiedGroupId === g.id;
+          html += '<button type="button" class="primary-btn" data-action="copy-message" data-id="'+g.id+'" '+(hasMessage?'':'disabled')+'>'+
+            (copied ? 'Copied' : 'Copy message')+'</button>';
+
+          html += '<div class="contacts"><p class="field-label">People ('+count+')</p>';
+
+          if(count > 0){
+            var pct = Math.round((sentCount / count) * 100);
+            html += '<p class="progress-label"><span>'+sentCount+' of '+count+' sent</span>'+
+              (g.completed ? '<span class="badge-complete">Complete</span>' : '')+'</p>';
+            html += '<div class="progress-track"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
+          }
+
+          g.memberIds.forEach(function(pid){
+            var person = findPerson(pid);
+            if(!person) return;
+            var isSent = g.sentIds.indexOf(pid) !== -1;
+            html += '<div class="contact-row'+(isSent?' sent':'')+'">';
+            html += '<input type="checkbox" class="sent-check" data-action="toggle-sent" data-id="'+g.id+'" data-person="'+pid+'" '+(isSent?'checked':'')+' aria-label="Mark '+escapeHtml(person.name)+' as sent" />';
+            html += renderAvatar(person, 28);
+            html += '<span class="contact-name">'+escapeHtml(person.name)+'</span>';
+            if(person.link){
+              html += '<button type="button" class="pill-btn" data-action="open-chat" data-link="'+escapeHtml(person.link)+'">Open chat</button>';
+            } else {
+              html += '<span class="pill-btn disabled">No link yet</span>';
+            }
+            html += '<button type="button" class="icon-btn" data-action="remove-member" data-id="'+g.id+'" data-person="'+pid+'">Remove</button>';
+            html += '</div>';
+          });
+          html += '</div>';
+
+          if(count > 0){
+            html += '<div class="checklist-actions">';
+            html += '<button type="button" class="primary-btn" data-action="finish-group" data-id="'+g.id+'" '+(sentCount===0?'disabled':'')+'>'+
+              (g.completed ? 'Marked complete' : 'Finish')+'</button>';
+            html += '<button type="button" class="link-btn danger" data-action="reset-checklist" data-id="'+g.id+'" '+((sentCount===0 && !g.completed)?'disabled':'')+'>Reset checklist</button>';
+            html += '</div>';
+          }
+
+          var available = peopleState.people.filter(function(p){ return g.memberIds.indexOf(p.id) === -1; });
+          html += '<div class="member-picker">';
+          if(peopleState.people.length === 0){
+            html += '<p class="hint-text">Add people in the People section below, then come back to add them here.</p>';
+          } else if(available.length === 0){
+            html += '<p class="hint-text">Everyone you have added is already in this group.</p>';
+          } else {
+            html += '<form class="add-member-form" data-action="add-member" data-id="'+g.id+'">';
+            html += '<select name="personId">';
+            available.forEach(function(p){ html += '<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>'; });
+            html += '</select>';
+            html += '<button type="submit">Add to group</button>';
+            html += '</form>';
+          }
+          html += '</div>';
+
+          html += '</div>';
+        }
+        html += '</li>';
+      });
+      html += '</ul>';
+    }
+
+    html += '<div class="add-card"><h3>Add a group</h3>';
+    html += '<form data-action="add-group">';
+    html += '<input type="text" id="newGroupName" placeholder="e.g. Book club" required />';
+    html += '<button type="submit">Add group</button>';
+    html += '</form></div>';
+
+    // People: no cap here -- everyone you add is pushed onto the list with
+    // no maximum length check, so there is no limit on how many people you
+    // can save.
+    html += '<h2 class="section-title">People</h2>';
+    if(peopleState.people.length === 0){
+      html += '<p class="empty-state">No people yet. Add someone below to get started.</p>';
+    } else {
+      html += '<ul class="person-list">';
+      peopleState.people.forEach(function(p){
+        var expanded = uiState.expandedPersonId === p.id;
+        html += '<li class="person-row">';
+        html += '<button type="button" class="person-head" data-action="toggle-person" data-id="'+p.id+'">';
+        html += '<span class="chevron'+(expanded?' open':'')+'">&#8250;</span>';
+        html += renderAvatar(p, 32);
+        html += '<span class="person-name">'+escapeHtml(p.name)+'</span>';
+        if(!p.link){ html += '<span class="person-status">No link yet</span>'; }
+        html += '</button>';
+
+        if(expanded){
+          html += '<div class="person-panel">';
+          html += '<div class="panel-manage">';
+          if(uiState.editingPersonId !== p.id){
+            html += '<button type="button" class="link-btn" data-action="start-edit-person" data-id="'+p.id+'">Edit details</button>';
+          } else {
+            html += '<span></span>';
+          }
+          var pendingDelP = uiState.pendingDeletePersonId === p.id;
+          html += '<button type="button" class="link-btn danger" data-action="request-delete-person" data-id="'+p.id+'">'+
+            (pendingDelP ? 'Tap again to delete' : 'Delete person')+'</button>';
+          html += '</div>';
+
+          html += '<div class="photo-edit">';
+          html += '<label for="photo-input-'+p.id+'" class="avatar-label">'+renderAvatar(p, 64)+'</label>';
+          html += '<input type="file" accept="image/*" id="photo-input-'+p.id+'" data-action="photo-input" data-id="'+p.id+'" style="display:none" />';
+          html += '<div class="photo-actions">';
+          html += '<label for="photo-input-'+p.id+'" class="link-btn">'+(p.photo ? 'Change photo' : 'Add photo')+'</label>';
+          if(p.photo){ html += '<button type="button" class="link-btn danger" data-action="remove-photo" data-id="'+p.id+'">Remove photo</button>'; }
+          html += '</div></div>';
+
+          if(uiState.editingPersonId === p.id){
+            html += '<form class="person-edit-form" data-action="save-person-details" data-id="'+p.id+'">';
+            html += '<label class="field-label" for="pname-'+p.id+'">Name</label>';
+            html += '<input type="text" id="pname-'+p.id+'" name="name" value="'+escapeHtml(p.name)+'" />';
+            html += '<label class="field-label" for="plink-'+p.id+'">Messenger link</label>';
+            html += '<input type="text" id="plink-'+p.id+'" name="link" value="'+escapeHtml(p.link||'')+'" placeholder="Paste their profile or m.me link" />';
+            html += '<button type="submit">Save</button>';
+            html += '</form>';
+          } else if(p.link){
+            html += '<p class="field-label">Messenger link</p>';
+            html += '<p class="link-preview">'+escapeHtml(p.link)+'</p>';
+          }
+          html += '</div>';
+        }
+        html += '</li>';
+      });
+      html += '</ul>';
+    }
+
+    html += '<div class="add-card"><h3>Add a person</h3>';
+    html += '<form data-action="add-person">';
+    html += '<input type="text" id="newPersonName" placeholder="Name" required />';
+    html += '<input type="text" id="newPersonLink" placeholder="Messenger link (optional for now)" />';
+    html += '<button type="submit">Add person</button>';
+    html += '</form></div>';
+
+    html += '<footer class="page-foot"><button type="button" class="link-btn danger" data-action="request-clear-all">'+
+      (uiState.pendingClearAll ? 'Tap again to erase everything' : 'Clear all data')+'</button></footer>';
+
+    return html;
+  }
+
+  function renderCalendarTab(){
+    var html = '';
+    html += '<div class="section-headrow"><h2 class="section-title">Calendar</h2>' +
+      '<button type="button" class="link-btn" data-action="exit-calendar">Exit</button></div>';
+
+    var year = uiState.calYear;
+    var monthIdx = uiState.calMonth;
+    var atEarliest = (year === CURRENT_YEAR && monthIdx === CURRENT_MONTH);
+
+    html += '<div class="month-nav">';
+    html += '<button type="button" class="month-nav-btn" data-action="cal-prev-month" '+(atEarliest?'disabled':'')+' aria-label="Previous month">&lsaquo;</button>';
+    html += '<span class="month-label">'+MONTH_NAMES[monthIdx]+' '+year+'</span>';
+    html += '<button type="button" class="month-nav-btn" data-action="cal-next-month" aria-label="Next month">&rsaquo;</button>';
+    html += '</div>';
+
+    html += '<div class="calendar-legend"><span><span class="legend-today"></span>Today</span><span><span class="legend-dot"></span>Has a note</span></div>';
+
+    html += '<div class="calendar-grid">';
+    WEEKDAY_NAMES.forEach(function(wd){ html += '<div class="calendar-weekday">'+wd+'</div>'; });
+
+    var firstWeekday = new Date(year, monthIdx, 1).getDay();
+    var numDays = daysInMonth(year, monthIdx);
+    for(var i=0; i<firstWeekday; i++){
+      html += '<div class="calendar-cell empty"></div>';
+    }
+    for(var d=1; d<=numDays; d++){
+      var dKey = dateKey(year, monthIdx, d);
+      var dEntry = getCalEntry(dKey);
+      var hasNote = !!(dEntry.note && dEntry.note.trim());
+      var isToday = (year===CURRENT_YEAR && monthIdx===CURRENT_MONTH && d===CURRENT_DATE);
+      var isSelected = (uiState.calExpandedDate === dKey);
+      var cls = 'calendar-cell' + (isToday?' is-today':'') + (isSelected?' is-selected':'');
+      html += '<button type="button" class="'+cls+'" data-action="cal-toggle-date" data-date="'+dKey+'">';
+      if(dEntry.alarm){ html += '<span class="cell-alarm">\u23F0</span>'; }
+      html += '<span class="cell-day">'+d+'</span>';
+      if(hasNote){ html += '<span class="cell-dot"></span>'; }
+      html += '</button>';
+    }
+    html += '</div>';
+
+    if(uiState.calExpandedDate){
+      var key = uiState.calExpandedDate;
+      var keyParts = key.split('-');
+      // Only show the editor if the selected date belongs to the month on screen.
+      if(parseInt(keyParts[0],10) === year && (parseInt(keyParts[1],10)-1) === monthIdx){
+        var dayNum = parseInt(keyParts[2], 10);
+        var entry = getCalEntry(key);
+        html += '<div class="calendar-editor group-panel">';
+        html += '<div class="panel-manage">';
+        html += '<h3 style="margin:0;font-family:Georgia,serif;font-size:15px;">'+formatDateHeading(year, monthIdx, dayNum)+'</h3>';
+        html += '<button type="button" class="link-btn" data-action="cal-back-to-days">&larr; Back</button>';
+        html += '</div>';
+        html += '<label class="field-label" for="cal-note-'+key+'">Notes</label>';
+        html += '<textarea id="cal-note-'+key+'" rows="4" data-action="edit-calendar-note" data-date="'+key+'" placeholder="Add a note for this date">'+escapeHtml(entry.note)+'</textarea>';
+        html += '<label class="field-label" for="cal-alarm-'+key+'">Alarm</label>';
+        html += '<input type="time" id="cal-alarm-'+key+'" data-action="edit-calendar-alarm" data-date="'+key+'" value="'+escapeHtml(entry.alarm)+'" />';
+        html += '<p class="hint-text">The alarm fires as a notification while this app is open on the day of the reminder. It can\'t wake a closed app.</p>';
+        html += '<button type="button" class="link-btn danger" style="margin-top:10px;" data-action="clear-calendar-entry" data-date="'+key+'">Delete this note</button>';
+        html += '</div>';
+      }
+    }
+
+    return html;
+  }
+
+  function renderTodoTab(){
+    var html = '';
+    html += '<h2 class="section-title">To-Do Lists</h2>';
+
+    if(todoState.lists.length === 0){
+      html += '<p class="empty-state">No lists yet. Add one below to get started.</p>';
+    } else {
+      html += '<ul class="group-list">';
+      todoState.lists.forEach(function(list){
+        var expanded = uiState.expandedListId === list.id;
+        var total = list.notes.length;
+        var doneCount = list.notes.filter(function(n){ return n.done; }).length;
+
+        html += '<li class="group-row">';
+        html += '<button type="button" class="group-head" data-action="toggle-todolist" data-id="'+list.id+'">';
+        html += '<span class="chevron'+(expanded?' open':'')+'">&#8250;</span>';
+        html += '<span class="group-name">'+escapeHtml(list.name)+(list.urgent?' <span class="list-flag" title="Urgent list">\uD83D\uDEA9</span>':'')+'</span>';
+        html += '<span class="group-count">'+total+' '+(total===1?'note':'notes')+(total>0?'<br>'+doneCount+'/'+total+' done':'')+'</span>';
+        html += '</button>';
+
+        if(expanded){
+          html += '<div class="group-panel">';
+          html += '<div class="panel-manage">';
+          if(uiState.renamingListId === list.id){
+            html += '<form class="rename-form" data-action="confirm-rename-list" data-id="'+list.id+'">';
+            html += '<input type="text" name="rename" value="'+escapeHtml(list.name)+'" />';
+            html += '<button type="submit">Save</button></form>';
+          } else {
+            html += '<button type="button" class="link-btn" data-action="start-rename-list" data-id="'+list.id+'">Rename</button>';
+          }
+          html += '<button type="button" class="link-btn" data-action="toggle-list-urgent" data-id="'+list.id+'">'+(list.urgent?'\uD83D\uDEA9 Urgent':'Mark urgent')+'</button>';
+          var pendingDelL = uiState.pendingDeleteListId === list.id;
+          html += '<button type="button" class="link-btn danger" data-action="request-delete-list" data-id="'+list.id+'">'+
+            (pendingDelL ? 'Tap again to delete' : 'Delete list')+'</button>';
+          html += '</div>';
+
+          html += '<div class="contacts">';
+          if(total === 0){
+            html += '<p class="hint-text">No notes in this list yet.</p>';
+          } else {
+            list.notes.forEach(function(note){
+              var pendingDelN = uiState.pendingDeleteNoteId === note.id;
+              html += '<div class="contact-row'+(note.done?' sent':'')+(note.urgent?' urgent':'')+'">';
+              html += '<input type="checkbox" class="sent-check" data-action="toggle-note-done" data-list="'+list.id+'" data-note="'+note.id+'" '+(note.done?'checked':'')+' aria-label="Mark note done" />';
+              html += '<span class="contact-name">'+escapeHtml(note.text)+'</span>';
+              html += '<button type="button" class="flag-btn'+(note.urgent?' active':'')+'" data-action="toggle-note-urgent" data-list="'+list.id+'" data-note="'+note.id+'" title="Mark urgent" aria-label="Toggle urgent">\uD83D\uDEA9</button>';
+              html += '<button type="button" class="icon-btn" data-action="request-delete-note" data-list="'+list.id+'" data-note="'+note.id+'">'+(pendingDelN?'Tap again':'Remove')+'</button>';
+              html += '</div>';
+            });
+          }
+          html += '</div>';
+
+          html += '<form class="add-member-form" data-action="add-note" data-id="'+list.id+'" style="margin-top:14px;">';
+          html += '<input type="text" name="noteText" placeholder="Add a note" style="flex:1 1 100%;" required />';
+          html += '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);">';
+          html += '<input type="checkbox" name="noteUrgent" style="width:auto;" /> \uD83D\uDEA9 Urgent</label>';
+          html += '<button type="submit">Add note</button>';
+          html += '</form>';
+
+          html += '</div>';
+        }
+        html += '</li>';
+      });
+      html += '</ul>';
+    }
+
+    html += '<div class="add-card"><h3>Add a list</h3>';
+    html += '<form data-action="add-todolist">';
+    html += '<input type="text" id="newListName" placeholder="e.g. Groceries" required />';
+    html += '<button type="submit">Add list</button>';
+    html += '</form></div>';
+
+    return html;
+  }
+
+  function collapsePersonTransient(exceptId){
+    if(uiState.editingPersonId && uiState.editingPersonId !== exceptId) uiState.editingPersonId = null;
+    if(uiState.pendingDeletePersonId && uiState.pendingDeletePersonId !== exceptId){
+      uiState.pendingDeletePersonId = null;
+      if(pendingDeletePersonTimeout){ clearTimeout(pendingDeletePersonTimeout); pendingDeletePersonTimeout = null; }
+    }
+  }
+  function collapseGroupTransient(exceptId){
+    if(uiState.renamingGroupId && uiState.renamingGroupId !== exceptId) uiState.renamingGroupId = null;
+    if(uiState.pendingDeleteGroupId && uiState.pendingDeleteGroupId !== exceptId){
+      uiState.pendingDeleteGroupId = null;
+      if(pendingDeleteGroupTimeout){ clearTimeout(pendingDeleteGroupTimeout); pendingDeleteGroupTimeout = null; }
+    }
+  }
+  function collapseListTransient(exceptId){
+    if(uiState.renamingListId && uiState.renamingListId !== exceptId) uiState.renamingListId = null;
+    if(uiState.pendingDeleteListId && uiState.pendingDeleteListId !== exceptId){
+      uiState.pendingDeleteListId = null;
+      if(pendingDeleteListTimeout){ clearTimeout(pendingDeleteListTimeout); pendingDeleteListTimeout = null; }
+    }
+  }
+
+  var app = document.getElementById('app');
+
+  app.addEventListener('click', function(e){
+    var el = e.target.closest('[data-action]');
+    if(!el) return;
+    var action = el.dataset.action;
+    var id = el.dataset.id;
+
+    if(action === 'switch-tab'){
+      uiState.activeTab = el.dataset.tab;
+      render();
+    }
+    else if(action === 'toggle-person'){
+      uiState.expandedPersonId = (uiState.expandedPersonId === id) ? null : id;
+      collapsePersonTransient(null);
+      render();
+    }
+    else if(action === 'start-edit-person'){
+      uiState.editingPersonId = id;
+      render();
+    }
+    else if(action === 'remove-photo'){
+      var p0 = findPerson(id);
+      if(p0){ p0.photo = null; savePeople(); render(); }
+    }
+    else if(action === 'request-delete-person'){
+      if(uiState.pendingDeletePersonId === id){
+        peopleState.people = peopleState.people.filter(function(p){ return p.id !== id; });
+        groupsState.groups.forEach(function(g){
+          g.memberIds = g.memberIds.filter(function(pid){ return pid !== id; });
+          g.sentIds = g.sentIds.filter(function(pid){ return pid !== id; });
+        });
+        if(uiState.expandedPersonId === id) uiState.expandedPersonId = null;
+        uiState.editingPersonId = null;
+        uiState.pendingDeletePersonId = null;
+        if(pendingDeletePersonTimeout){ clearTimeout(pendingDeletePersonTimeout); pendingDeletePersonTimeout = null; }
+        savePeople(); saveGroups(); render();
+      } else {
+        uiState.pendingDeletePersonId = id;
+        if(pendingDeletePersonTimeout) clearTimeout(pendingDeletePersonTimeout);
+        pendingDeletePersonTimeout = setTimeout(function(){ uiState.pendingDeletePersonId = null; render(); }, 3000);
+        render();
+      }
+    }
+    else if(action === 'toggle-group'){
+      uiState.expandedGroupId = (uiState.expandedGroupId === id) ? null : id;
+      collapseGroupTransient(null);
+      render();
+    }
+    else if(action === 'start-rename'){
+      uiState.renamingGroupId = id;
+      render();
+    }
+    else if(action === 'request-delete-group'){
+      if(uiState.pendingDeleteGroupId === id){
+        groupsState.groups = groupsState.groups.filter(function(g){ return g.id !== id; });
+        if(uiState.expandedGroupId === id) uiState.expandedGroupId = null;
+        uiState.pendingDeleteGroupId = null;
+        if(pendingDeleteGroupTimeout){ clearTimeout(pendingDeleteGroupTimeout); pendingDeleteGroupTimeout = null; }
+        saveGroups(); render();
+      } else {
+        uiState.pendingDeleteGroupId = id;
+        if(pendingDeleteGroupTimeout) clearTimeout(pendingDeleteGroupTimeout);
+        pendingDeleteGroupTimeout = setTimeout(function(){ uiState.pendingDeleteGroupId = null; render(); }, 3000);
+        render();
+      }
+    }
+    else if(action === 'copy-message'){
+      var g = findGroup(id);
+      if(!g || !g.message.trim()) return;
+      copyToClipboard(g.message).then(function(){
+        uiState.copiedGroupId = id;
+        render();
+        if(copiedTimeout) clearTimeout(copiedTimeout);
+        copiedTimeout = setTimeout(function(){ uiState.copiedGroupId = null; render(); }, 1500);
+      }).catch(function(){
+        showBanner("Couldn't copy automatically. Long-press the message box above to copy it manually.");
+      });
+    }
+    else if(action === 'quick-copy'){
+      var qText = quickMessageDraft;
+      if(!qText.trim()) return;
+      copyToClipboard(qText).then(function(){
+        quickMessageDraft = '';
+        uiState.quickCopied = true;
+        render();
+        if(quickCopiedTimeout) clearTimeout(quickCopiedTimeout);
+        quickCopiedTimeout = setTimeout(function(){ uiState.quickCopied = false; render(); }, 1500);
+      }).catch(function(){
+        showBanner("Couldn't copy automatically. Long-press the message box above to copy it manually.");
+      });
+    }
+    else if(action === 'open-chat'){
+      var link = el.dataset.link;
+      openMessengerHref(link);
+    }
+    else if(action === 'remove-member'){
+      var g2 = findGroup(id);
+      if(!g2) return;
+      var pid = el.dataset.person;
+      g2.memberIds = g2.memberIds.filter(function(x){ return x !== pid; });
+      g2.sentIds = g2.sentIds.filter(function(x){ return x !== pid; });
+      saveGroups(); render();
+    }
+    else if(action === 'finish-group'){
+      var g3 = findGroup(id);
+      if(g3){ g3.completed = true; saveGroups(); render(); }
+    }
+    else if(action === 'reset-checklist'){
+      var g4 = findGroup(id);
+      if(g4){ g4.sentIds = []; g4.completed = false; saveGroups(); render(); }
+    }
+    else if(action === 'request-clear-all'){
+      if(uiState.pendingClearAll){
+        peopleState = { people: [] };
+        groupsState = { groups: [] };
+        calendarState = { entries: {} };
+        todoState = { lists: [] };
+        uiState.expandedPersonId = null; uiState.editingPersonId = null; uiState.pendingDeletePersonId = null;
+        uiState.expandedGroupId = null; uiState.renamingGroupId = null; uiState.pendingDeleteGroupId = null;
+        uiState.pendingClearAll = false; uiState.copiedGroupId = null;
+        uiState.calMonth = CURRENT_MONTH; uiState.calExpandedDate = null; uiState.calYear = CURRENT_YEAR;
+        uiState.expandedListId = null; uiState.renamingListId = null; uiState.pendingDeleteListId = null; uiState.pendingDeleteNoteId = null;
+        if(pendingClearTimeout){ clearTimeout(pendingClearTimeout); pendingClearTimeout = null; }
+        savePeople(); saveGroups(); saveCalendar(); saveTodo(); render();
+      } else {
+        uiState.pendingClearAll = true;
+        if(pendingClearTimeout) clearTimeout(pendingClearTimeout);
+        pendingClearTimeout = setTimeout(function(){ uiState.pendingClearAll = false; render(); }, 3000);
+        render();
+      }
+    }
+    else if(action === 'dismiss-banner'){
+      clearBanner();
+    }
+    // --- Calendar actions ---
+    else if(action === 'exit-calendar'){
+      uiState.activeTab = 'messages';
+      uiState.calExpandedDate = null;
+      render();
+    }
+    else if(action === 'cal-prev-month'){
+      var atStart = (uiState.calYear === CURRENT_YEAR && uiState.calMonth === CURRENT_MONTH);
+      if(!atStart){
+        uiState.calMonth -= 1;
+        if(uiState.calMonth < 0){ uiState.calMonth = 11; uiState.calYear -= 1; }
+        uiState.calExpandedDate = null;
+        render();
+      }
+    }
+    else if(action === 'cal-next-month'){
+      uiState.calMonth += 1;
+      if(uiState.calMonth > 11){ uiState.calMonth = 0; uiState.calYear += 1; }
+      uiState.calExpandedDate = null;
+      render();
+    }
+    else if(action === 'cal-toggle-date'){
+      var dKey2 = el.dataset.date;
+      uiState.calExpandedDate = (uiState.calExpandedDate === dKey2) ? null : dKey2;
+      render();
+    }
+    else if(action === 'cal-back-to-days'){
+      uiState.calExpandedDate = null;
+      render();
+    }
+    else if(action === 'clear-calendar-entry'){
+      var ckey = el.dataset.date;
+      delete calendarState.entries[ckey];
+      saveCalendar(); scheduleTodaysAlarms(); render();
+    }
+    // --- To-do actions ---
+    else if(action === 'toggle-todolist'){
+      uiState.expandedListId = (uiState.expandedListId === id) ? null : id;
+      collapseListTransient(null);
+      render();
+    }
+    else if(action === 'start-rename-list'){
+      uiState.renamingListId = id;
+      render();
+    }
+    else if(action === 'toggle-list-urgent'){
+      var tl = findTodoList(id);
+      if(tl){ tl.urgent = !tl.urgent; saveTodo(); render(); }
+    }
+    else if(action === 'request-delete-list'){
+      if(uiState.pendingDeleteListId === id){
+        todoState.lists = todoState.lists.filter(function(l){ return l.id !== id; });
+        if(uiState.expandedListId === id) uiState.expandedListId = null;
+        uiState.renamingListId = null;
+        uiState.pendingDeleteListId = null;
+        if(pendingDeleteListTimeout){ clearTimeout(pendingDeleteListTimeout); pendingDeleteListTimeout = null; }
+        saveTodo(); render();
+      } else {
+        uiState.pendingDeleteListId = id;
+        if(pendingDeleteListTimeout) clearTimeout(pendingDeleteListTimeout);
+        pendingDeleteListTimeout = setTimeout(function(){ uiState.pendingDeleteListId = null; render(); }, 3000);
+        render();
+      }
+    }
+    else if(action === 'toggle-note-urgent'){
+      var refs1 = findTodoNoteRefs(el.dataset.list, el.dataset.note);
+      if(refs1){ refs1.note.urgent = !refs1.note.urgent; saveTodo(); render(); }
+    }
+    else if(action === 'request-delete-note'){
+      var noteId = el.dataset.note;
+      var listId = el.dataset.list;
+      if(uiState.pendingDeleteNoteId === noteId){
+        var listRef = findTodoList(listId);
+        if(listRef){ listRef.notes = listRef.notes.filter(function(n){ return n.id !== noteId; }); }
+        uiState.pendingDeleteNoteId = null;
+        if(pendingDeleteNoteTimeout){ clearTimeout(pendingDeleteNoteTimeout); pendingDeleteNoteTimeout = null; }
+        saveTodo(); render();
+      } else {
+        uiState.pendingDeleteNoteId = noteId;
+        if(pendingDeleteNoteTimeout) clearTimeout(pendingDeleteNoteTimeout);
+        pendingDeleteNoteTimeout = setTimeout(function(){ uiState.pendingDeleteNoteId = null; render(); }, 3000);
+        render();
+      }
+    }
+  });
+
+  app.addEventListener('submit', function(e){
+    var form = e.target.closest('[data-action]');
+    if(!form) return;
+    e.preventDefault();
+    var action = form.dataset.action;
+    var id = form.dataset.id;
+
+    if(action === 'add-person'){
+      var nameInput = document.getElementById('newPersonName');
+      var linkInput = document.getElementById('newPersonLink');
+      var name = (nameInput.value || '').trim();
+      if(!name) return;
+      // No cap on the number of people that can be added.
+      var newPerson = { id: genId('p'), name: name, link: normalizeLink(linkInput.value), photo: null };
+      peopleState.people.push(newPerson);
+      uiState.expandedPersonId = newPerson.id;
+      savePeople(); render();
+    }
+    else if(action === 'save-person-details'){
+      var p = findPerson(id);
+      if(p){
+        var newName = (form.elements.name.value || '').trim();
+        if(newName) p.name = newName;
+        p.link = normalizeLink(form.elements.link.value);
+      }
+      uiState.editingPersonId = null;
+      savePeople(); render();
+    }
+    else if(action === 'add-group'){
+      var gNameInput = document.getElementById('newGroupName');
+      var gName = (gNameInput.value || '').trim();
+      if(!gName) return;
+      var newGroup = { id: genId('grp'), name: gName, message: '', memberIds: [], sentIds: [], completed: false };
+      groupsState.groups.push(newGroup);
+      uiState.expandedGroupId = newGroup.id;
+      saveGroups(); render();
+    }
+    else if(action === 'confirm-rename'){
+      var g = findGroup(id);
+      var newGName = (form.elements.rename.value || '').trim();
+      if(g && newGName){ g.name = newGName; }
+      uiState.renamingGroupId = null;
+      saveGroups(); render();
+    }
+    else if(action === 'add-member'){
+      var g2 = findGroup(id);
+      if(!g2) return;
+      var personId = form.elements.personId.value;
+      if(personId && g2.memberIds.indexOf(personId) === -1){
+        g2.memberIds.push(personId);
+        saveGroups(); render();
+      }
+    }
+    else if(action === 'add-todolist'){
+      var listNameInput = document.getElementById('newListName');
+      var listName = (listNameInput.value || '').trim();
+      if(!listName) return;
+      var newList = { id: genId('tlist'), name: listName, urgent: false, notes: [] };
+      todoState.lists.push(newList);
+      uiState.expandedListId = newList.id;
+      saveTodo(); render();
+    }
+    else if(action === 'confirm-rename-list'){
+      var tl2 = findTodoList(id);
+      var newListName = (form.elements.rename.value || '').trim();
+      if(tl2 && newListName){ tl2.name = newListName; }
+      uiState.renamingListId = null;
+      saveTodo(); render();
+    }
+    else if(action === 'add-note'){
+      var listForNote = findTodoList(id);
+      if(!listForNote) return;
+      var noteText = (form.elements.noteText.value || '').trim();
+      if(!noteText) return;
+      var isUrgent = !!form.elements.noteUrgent.checked;
+      listForNote.notes.push({ id: genId('note'), text: noteText, done: false, urgent: isUrgent });
+      saveTodo(); render();
+    }
+  });
+
+  app.addEventListener('focusout', function(e){
+    if(e.target.dataset && e.target.dataset.action === 'edit-message'){
+      var g = findGroup(e.target.dataset.id);
+      if(g){ g.message = e.target.value; saveGroups(); render(); }
+    }
+    else if(e.target.dataset && e.target.dataset.action === 'edit-quick-message'){
+      quickMessageDraft = e.target.value;
+      render();
+    }
+    else if(e.target.dataset && e.target.dataset.action === 'edit-calendar-note'){
+      var dKey = e.target.dataset.date;
+      var entry = calendarState.entries[dKey] || { note: '', alarm: '' };
+      entry.note = e.target.value;
+      calendarState.entries[dKey] = entry;
+      saveCalendar(); render();
+    }
+  });
+
+  app.addEventListener('change', function(e){
+    if(e.target.matches && e.target.matches('input[type="file"]') && e.target.dataset.action === 'photo-input'){
+      var id = e.target.dataset.id;
+      var file = e.target.files && e.target.files[0];
+      if(!file) return;
+      loadAndResizeImage(file).then(function(dataUrl){
+        var p = findPerson(id);
+        if(p){ p.photo = dataUrl; savePeople(); render(); }
+      }).catch(function(){
+        showBanner("Couldn't load that photo. Try a different image.");
+      });
+    }
+    else if(e.target.matches && e.target.matches('input[type="checkbox"]') && e.target.dataset.action === 'toggle-sent'){
+      var gId = e.target.dataset.id;
+      var pId = e.target.dataset.person;
+      var g5 = findGroup(gId);
+      if(g5){
+        var idx = g5.sentIds.indexOf(pId);
+        if(e.target.checked){
+          if(idx === -1) g5.sentIds.push(pId);
+        } else {
+          if(idx !== -1) g5.sentIds.splice(idx, 1);
+          g5.completed = false;
+        }
+        saveGroups(); render();
+      }
+    }
+    else if(e.target.matches && e.target.matches('input[type="time"]') && e.target.dataset.action === 'edit-calendar-alarm'){
+      var dKey2 = e.target.dataset.date;
+      var entry2 = calendarState.entries[dKey2] || { note: '', alarm: '' };
+      entry2.alarm = e.target.value;
+      calendarState.entries[dKey2] = entry2;
+      saveCalendar(); render();
+      if('Notification' in window && Notification.permission === 'default'){
+        Notification.requestPermission();
+      }
+      scheduleTodaysAlarms();
+    }
+    else if(e.target.matches && e.target.matches('input[type="checkbox"]') && e.target.dataset.action === 'toggle-note-done'){
+      var refs2 = findTodoNoteRefs(e.target.dataset.list, e.target.dataset.note);
+      if(refs2){ refs2.note.done = e.target.checked; saveTodo(); render(); }
+    }
+  });
+
+  Promise.all([loadPeople(), loadGroups(), loadCalendar(), loadTodo()]).then(function(results){
+    peopleState = results[0];
+    groupsState = results[1];
+    calendarState = results[2];
+    todoState = results[3];
+    render();
+    scheduleTodaysAlarms();
+  });
+})();
+
+// Register the service worker so the app keeps working offline once it's
+// been opened once (needed for a proper installable PWA / APK).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){ /* offline caching is optional */ });
+  });
+}
+</script>
+</body>
+</html>
