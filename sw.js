@@ -1,7 +1,7 @@
 // Minimal app-shell cache so the PWA still opens (from a cached copy)
-// when the device has no connection. Data itself lives in localStorage,
+// when the device has no connection. Data itself lives in Firebase,
 // which already persists independently of this cache.
-const CACHE_NAME = 'mariels-application-v1';
+const CACHE_NAME = 'mariels-application-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,7 +11,13 @@ const APP_SHELL = [
   './icon-maskable-192.png',
   './icon-maskable-512.png',
   './apple-touch-icon.png',
-  './favicon-32.png'
+  './favicon-32.png',
+  './love-1.jpg',
+  './love-2.jpg',
+  './love-3.jpg',
+  './love-4.jpg',
+  './love-5.jpg',
+  './love-6.jpg'
 ];
 
 self.addEventListener('install', function(event){
