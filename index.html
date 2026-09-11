@@ -303,16 +303,20 @@
   }
   .calendar-cell.is-selected .cell-dot{ background: var(--accent-contrast); }
   .cell-alarm{ font-size: 8px; position:absolute; top:3px; right:4px; line-height:1; }
+  .cell-todo{ font-size: 9px; font-weight:700; position:absolute; top:3px; left:4px; line-height:1; color: var(--accent); }
+  .calendar-cell.is-selected .cell-todo{ color: var(--accent-contrast); }
 
-  .calendar-legend{ display:flex; gap:16px; font-size:11.5px; color: var(--muted); margin: 6px 2px 4px; }
+  .calendar-legend{ display:flex; gap:14px; font-size:11.5px; color: var(--muted); margin: 6px 2px 4px; flex-wrap:wrap; }
   .calendar-legend .legend-dot{
     display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent); margin-right:5px; vertical-align:middle;
   }
   .calendar-legend .legend-today{
     display:inline-block; width:9px; height:9px; border-radius:2px; border:2px solid var(--accent); margin-right:5px; vertical-align:middle;
   }
+  .calendar-legend .legend-todo-mark{ color: var(--accent); font-weight:700; margin-right:5px; }
 
   .calendar-editor{ margin-top: 14px; }
+  .calendar-day-placeholder{ display:none; } /* only shown on desktop widths, see media query below */
 
   /* To-Do */
   .flag-btn{
@@ -320,8 +324,46 @@
     flex-shrink:0; opacity:.32; filter:grayscale(1);
   }
   .flag-btn.active{ opacity:1; filter:none; }
-  .list-flag{ color: var(--danger); font-size: 13px; margin-left: 4px; }
   .contact-row.urgent{ border-left: 3px solid var(--danger); padding-left: 7px; margin-left: -10px; }
+
+  /* ===========================================================
+     Desktop layout
+     Everything below only applies at wide viewport widths (an
+     actual desktop/laptop browser window opened via the web
+     link). The packaged phone app's WebView is always narrower
+     than this breakpoint, so its layout stays pixel-identical.
+     =========================================================== */
+  @media (min-width: 900px){
+    .page{ max-width: 960px; padding: 40px 56px 72px; }
+    .page-head .sub{ max-width: 52ch; }
+    .tab-bar{ max-width: 380px; margin: 18px auto 6px; }
+
+    /* Messages tab: Groups and People side by side instead of stacked */
+    .messages-columns{ display:grid; grid-template-columns: 1fr 1fr; gap: 0 40px; align-items:start; }
+    .messages-columns .section-title:first-of-type{ margin-top: 20px; }
+
+    /* Calendar tab: month picker on the left, selected day's panel on the right */
+    .calendar-columns{ display:grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 0 32px; align-items:start; }
+    .calendar-picker{ max-width: 400px; }
+    .calendar-editor{ margin-top: 0; }
+    .calendar-day-placeholder{
+      display:flex; align-items:center; justify-content:center; text-align:center;
+      min-height: 220px; color: var(--muted); font-size: 14px; max-width: 34ch; margin: 0 auto;
+      background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,.1);
+      padding: 24px;
+    }
+  }
+
+  /* Hover affordances for mouse/trackpad only -- never applied on a touch
+     screen, so tapping in the phone app never gets "stuck" in a hover state. */
+  @media (hover: hover) and (pointer: fine){
+    .tab-btn:not(.active):hover{ background: var(--accent-soft); color: var(--accent); }
+    .person-head:hover, .group-head:hover, .month-head:hover{ background: var(--accent-soft); border-radius: 8px; }
+    .calendar-cell:not(.is-selected):hover{ border-color: var(--accent); }
+    .contact-row:hover{ background: rgba(214,51,108,0.05); border-radius: 6px; }
+    .primary-btn:not(:disabled):hover{ filter: brightness(1.07); }
+    .pill-btn:not(.disabled):hover{ filter: brightness(1.07); }
+  }
 </style>
 </head>
 <body>
@@ -394,8 +436,7 @@
 
   var peopleState = { people: [] };
   var groupsState = { groups: [] };
-  var calendarState = { entries: {} }; // key 'YYYY-MM-DD' -> { note: '', alarm: '' }
-  var todoState = { lists: [] }; // { id, name, urgent, notes: [ { id, text, done, urgent } ] }
+  var calendarState = { entries: {} }; // key 'YYYY-MM-DD' -> { note: '', alarm: '', todos: [ { id, text, done, urgent } ] }
 
   var today = new Date();
   var CURRENT_YEAR = today.getFullYear();
@@ -403,17 +444,16 @@
   var CURRENT_DATE = today.getDate();
 
   var uiState = {
-    activeTab: 'messages', // 'messages' | 'calendar' | 'todo'
+    activeTab: 'messages', // 'messages' | 'calendar'
     expandedPersonId: null, editingPersonId: null, pendingDeletePersonId: null,
     expandedGroupId: null, renamingGroupId: null, pendingDeleteGroupId: null,
     pendingClearAll: false, copiedGroupId: null, quickCopied: false,
     calYear: CURRENT_YEAR, calMonth: CURRENT_MONTH, calExpandedDate: null,
-    expandedListId: null, renamingListId: null, pendingDeleteListId: null, pendingDeleteNoteId: null
+    pendingDeleteTodoId: null
   };
   var pendingDeletePersonTimeout = null;
   var pendingDeleteGroupTimeout = null;
-  var pendingDeleteListTimeout = null;
-  var pendingDeleteNoteTimeout = null;
+  var pendingDeleteTodoTimeout = null;
   var pendingClearTimeout = null;
   var copiedTimeout = null;
   var quickCopiedTimeout = null;
@@ -538,40 +578,59 @@
       var res = await window.storage.get(STORAGE_CALENDAR_KEY, false);
       if(res && res.value){
         var parsed = JSON.parse(res.value);
-        if(parsed && typeof parsed.entries === 'object' && parsed.entries !== null) return parsed;
-      }
-    }catch(e){ /* no saved data yet */ }
-    return { entries: {} };
-  }
-  async function loadTodo(){
-    try{
-      var res = await window.storage.get(STORAGE_TODO_KEY, false);
-      if(res && res.value){
-        var parsed = JSON.parse(res.value);
-        if(parsed && Array.isArray(parsed.lists)){
-          parsed.lists.forEach(function(l){
-            if(!Array.isArray(l.notes)) l.notes = [];
-            if(typeof l.urgent !== 'boolean') l.urgent = false;
-            l.notes.forEach(function(n){
-              if(typeof n.done !== 'boolean') n.done = false;
-              if(typeof n.urgent !== 'boolean') n.urgent = false;
+        if(parsed && typeof parsed.entries === 'object' && parsed.entries !== null){
+          Object.keys(parsed.entries).forEach(function(k){
+            var entry = parsed.entries[k];
+            if(typeof entry.note !== 'string') entry.note = '';
+            if(typeof entry.alarm !== 'string') entry.alarm = '';
+            if(!Array.isArray(entry.todos)) entry.todos = [];
+            entry.todos.forEach(function(t){
+              if(typeof t.done !== 'boolean') t.done = false;
+              if(typeof t.urgent !== 'boolean') t.urgent = false;
             });
           });
           return parsed;
         }
-        // Migrate the old flat "items" format into a single default list.
-        if(parsed && Array.isArray(parsed.items)){
-          if(parsed.items.length === 0) return { lists: [] };
-          return { lists: [{
-            id: genId('tlist'), name: 'My List', urgent: false,
-            notes: parsed.items.map(function(it){
-              return { id: it.id || genId('note'), text: it.text || '', done: !!it.done, urgent: false };
-            })
-          }] };
-        }
       }
     }catch(e){ /* no saved data yet */ }
-    return { lists: [] };
+    return { entries: {} };
+  }
+
+  // One-time migration: the app used to have a separate "To-Do" tab with its
+  // own named lists, unrelated to any date. That tab is gone now that to-dos
+  // live inside each calendar date's panel, so on first load after this
+  // update we fold any old to-do items into *today's* calendar entry (the
+  // closest sensible date, since the old items were never tied to one) and
+  // remove the old storage key. Resolves to true if it changed anything, so
+  // the caller knows whether to persist calendarState.
+  function migrateOldTodos(entries){
+    return window.storage.get(STORAGE_TODO_KEY, false).then(function(res){
+      if(!res || !res.value) return false;
+      var parsed = null;
+      try{ parsed = JSON.parse(res.value); }catch(e){ parsed = null; }
+      var flatTodos = [];
+      if(parsed && Array.isArray(parsed.lists)){
+        parsed.lists.forEach(function(list){
+          (list.notes || []).forEach(function(n){
+            flatTodos.push({ id: genId('todo'), text: n.text || '', done: !!n.done, urgent: !!(n.urgent || list.urgent) });
+          });
+        });
+      } else if(parsed && Array.isArray(parsed.items)){
+        parsed.items.forEach(function(it){
+          flatTodos.push({ id: genId('todo'), text: it.text || '', done: !!it.done, urgent: false });
+        });
+      }
+      var changed = false;
+      if(flatTodos.length){
+        var todayKey = dateKey(CURRENT_YEAR, CURRENT_MONTH, CURRENT_DATE);
+        var entry = entries[todayKey] || { note: '', alarm: '', todos: [] };
+        if(!Array.isArray(entry.todos)) entry.todos = [];
+        entry.todos = entry.todos.concat(flatTodos);
+        entries[todayKey] = entry;
+        changed = true;
+      }
+      return window.storage.delete(STORAGE_TODO_KEY, false).catch(function(){}).then(function(){ return changed; });
+    }).catch(function(){ return false; });
   }
 
   async function savePeople(){
@@ -586,10 +645,6 @@
     try{ await window.storage.set(STORAGE_CALENDAR_KEY, JSON.stringify(calendarState), false); }
     catch(e){ showBanner("Couldn't save your changes. Check your connection and try again."); }
   }
-  async function saveTodo(){
-    try{ await window.storage.set(STORAGE_TODO_KEY, JSON.stringify(todoState), false); }
-    catch(e){ showBanner("Couldn't save your changes. Check your connection and try again."); }
-  }
 
   function findPerson(id){
     for(var i=0;i<peopleState.people.length;i++){ if(peopleState.people[i].id===id) return peopleState.people[i]; }
@@ -599,17 +654,20 @@
     for(var i=0;i<groupsState.groups.length;i++){ if(groupsState.groups[i].id===id) return groupsState.groups[i]; }
     return null;
   }
-  function findTodoList(id){
-    for(var i=0;i<todoState.lists.length;i++){ if(todoState.lists[i].id===id) return todoState.lists[i]; }
-    return null;
-  }
-  function findTodoNoteRefs(listId, noteId){
-    var list = findTodoList(listId);
-    if(!list) return null;
-    for(var i=0;i<list.notes.length;i++){
-      if(list.notes[i].id === noteId) return { list: list, note: list.notes[i] };
+  // Returns { entry, todo } for a to-do item nested inside a calendar date entry.
+  function findCalTodo(dKey, todoId){
+    var entry = calendarState.entries[dKey];
+    if(!entry || !Array.isArray(entry.todos)) return null;
+    for(var i=0;i<entry.todos.length;i++){
+      if(entry.todos[i].id === todoId) return { entry: entry, todo: entry.todos[i] };
     }
     return null;
+  }
+  // Gets (creating if needed) the calendar entry for a date, guaranteeing a todos array.
+  function ensureCalEntry(dKey){
+    if(!calendarState.entries[dKey]) calendarState.entries[dKey] = { note: '', alarm: '', todos: [] };
+    if(!Array.isArray(calendarState.entries[dKey].todos)) calendarState.entries[dKey].todos = [];
+    return calendarState.entries[dKey];
   }
 
   function loadAndResizeImage(file){
@@ -653,7 +711,7 @@
     return new Date(year, monthIdx + 1, 0).getDate();
   }
   function getCalEntry(key){
-    return calendarState.entries[key] || { note: '', alarm: '' };
+    return calendarState.entries[key] || { note: '', alarm: '', todos: [] };
   }
   function monthNoteCount(year, monthIdx){
     var prefix = year + '-' + pad2(monthIdx + 1) + '-';
@@ -712,13 +770,10 @@
     html += '<nav class="tab-bar">';
     html += '<button type="button" class="tab-btn'+(uiState.activeTab==='messages'?' active':'')+'" data-action="switch-tab" data-tab="messages">Messages</button>';
     html += '<button type="button" class="tab-btn'+(uiState.activeTab==='calendar'?' active':'')+'" data-action="switch-tab" data-tab="calendar">Calendar</button>';
-    html += '<button type="button" class="tab-btn'+(uiState.activeTab==='todo'?' active':'')+'" data-action="switch-tab" data-tab="todo">To-Do</button>';
     html += '</nav>';
 
     if(uiState.activeTab === 'calendar'){
       html += renderCalendarTab();
-    } else if(uiState.activeTab === 'todo'){
-      html += renderTodoTab();
     } else {
       html += renderMessagesTab();
     }
@@ -746,6 +801,8 @@
     html += '<button type="button" class="primary-btn" data-action="quick-copy" '+(quickHasText?'':'disabled')+'>'+(uiState.quickCopied?'Copied':'Copy')+'</button>';
     html += '</div>';
 
+    html += '<div class="messages-columns">';
+    html += '<div class="messages-col">';
     html += '<h2 class="section-title">Groups</h2>';
     if(groupsState.groups.length === 0){
       html += '<p class="empty-state">No groups yet. Add one below to get started.</p>';
@@ -850,7 +907,9 @@
     html += '<input type="text" id="newGroupName" placeholder="e.g. Book club" required />';
     html += '<button type="submit">Add group</button>';
     html += '</form></div>';
+    html += '</div>'; // .messages-col (Groups)
 
+    html += '<div class="messages-col">';
     // People: no cap here -- everyone you add is pushed onto the list with
     // no maximum length check, so there is no limit on how many people you
     // can save.
@@ -915,6 +974,8 @@
     html += '<input type="text" id="newPersonLink" placeholder="Messenger link (optional for now)" />';
     html += '<button type="submit">Add person</button>';
     html += '</form></div>';
+    html += '</div>'; // .messages-col (People)
+    html += '</div>'; // .messages-columns
 
     html += '<footer class="page-foot"><button type="button" class="link-btn danger" data-action="request-clear-all">'+
       (uiState.pendingClearAll ? 'Tap again to erase everything' : 'Clear all data')+'</button></footer>';
@@ -931,13 +992,16 @@
     var monthIdx = uiState.calMonth;
     var atEarliest = (year === CURRENT_YEAR && monthIdx === CURRENT_MONTH);
 
+    html += '<div class="calendar-columns">';
+    html += '<div class="calendar-picker">';
+
     html += '<div class="month-nav">';
     html += '<button type="button" class="month-nav-btn" data-action="cal-prev-month" '+(atEarliest?'disabled':'')+' aria-label="Previous month">&lsaquo;</button>';
     html += '<span class="month-label">'+MONTH_NAMES[monthIdx]+' '+year+'</span>';
     html += '<button type="button" class="month-nav-btn" data-action="cal-next-month" aria-label="Next month">&rsaquo;</button>';
     html += '</div>';
 
-    html += '<div class="calendar-legend"><span><span class="legend-today"></span>Today</span><span><span class="legend-dot"></span>Has a note</span></div>';
+    html += '<div class="calendar-legend"><span><span class="legend-today"></span>Today</span><span><span class="legend-dot"></span>Has a note</span><span><span class="legend-todo-mark">&#10003;</span>Has to-dos</span></div>';
 
     html += '<div class="calendar-grid">';
     WEEKDAY_NAMES.forEach(function(wd){ html += '<div class="calendar-weekday">'+wd+'</div>'; });
@@ -951,113 +1015,90 @@
       var dKey = dateKey(year, monthIdx, d);
       var dEntry = getCalEntry(dKey);
       var hasNote = !!(dEntry.note && dEntry.note.trim());
+      var hasOpenTodo = Array.isArray(dEntry.todos) && dEntry.todos.some(function(t){ return !t.done; });
       var isToday = (year===CURRENT_YEAR && monthIdx===CURRENT_MONTH && d===CURRENT_DATE);
       var isSelected = (uiState.calExpandedDate === dKey);
       var cls = 'calendar-cell' + (isToday?' is-today':'') + (isSelected?' is-selected':'');
       html += '<button type="button" class="'+cls+'" data-action="cal-toggle-date" data-date="'+dKey+'">';
+      if(hasOpenTodo){ html += '<span class="cell-todo">&#10003;</span>'; }
       if(dEntry.alarm){ html += '<span class="cell-alarm">\u23F0</span>'; }
       html += '<span class="cell-day">'+d+'</span>';
       if(hasNote){ html += '<span class="cell-dot"></span>'; }
       html += '</button>';
     }
     html += '</div>';
+    html += '</div>'; // .calendar-picker
 
+    var showEditor = false;
+    var editorHtml = '';
     if(uiState.calExpandedDate){
       var key = uiState.calExpandedDate;
       var keyParts = key.split('-');
       // Only show the editor if the selected date belongs to the month on screen.
       if(parseInt(keyParts[0],10) === year && (parseInt(keyParts[1],10)-1) === monthIdx){
+        showEditor = true;
         var dayNum = parseInt(keyParts[2], 10);
         var entry = getCalEntry(key);
-        html += '<div class="calendar-editor group-panel">';
-        html += '<div class="panel-manage">';
-        html += '<h3 style="margin:0;font-family:Georgia,serif;font-size:15px;">'+formatDateHeading(year, monthIdx, dayNum)+'</h3>';
-        html += '<button type="button" class="link-btn" data-action="cal-back-to-days">&larr; Back</button>';
-        html += '</div>';
-        html += '<label class="field-label" for="cal-note-'+key+'">Notes</label>';
-        html += '<textarea id="cal-note-'+key+'" rows="4" data-action="edit-calendar-note" data-date="'+key+'" placeholder="Add a note for this date">'+escapeHtml(entry.note)+'</textarea>';
-        html += '<label class="field-label" for="cal-alarm-'+key+'">Alarm</label>';
-        html += '<input type="time" id="cal-alarm-'+key+'" data-action="edit-calendar-alarm" data-date="'+key+'" value="'+escapeHtml(entry.alarm)+'" />';
-        html += '<p class="hint-text">The alarm fires as a notification while this app is open on the day of the reminder. It can\'t wake a closed app.</p>';
-        html += '<button type="button" class="link-btn danger" style="margin-top:10px;" data-action="clear-calendar-entry" data-date="'+key+'">Delete this note</button>';
-        html += '</div>';
+        var todos = entry.todos || [];
+        var todoTotal = todos.length;
+        var todoDone = todos.filter(function(t){ return t.done; }).length;
+
+        editorHtml += '<div class="calendar-editor group-panel">';
+        editorHtml += '<div class="panel-manage">';
+        editorHtml += '<h3 style="margin:0;font-family:Georgia,serif;font-size:15px;">'+formatDateHeading(year, monthIdx, dayNum)+'</h3>';
+        editorHtml += '<button type="button" class="link-btn" data-action="cal-back-to-days">&larr; Back</button>';
+        editorHtml += '</div>';
+
+        // --- Section 1: To-Do ---
+        editorHtml += '<p class="field-label" style="margin-top:4px;">To-Do'+(todoTotal>0?' &mdash; '+todoDone+'/'+todoTotal+' done':'')+'</p>';
+        editorHtml += '<div class="contacts">';
+        if(todoTotal === 0){
+          editorHtml += '<p class="hint-text" style="margin:0 0 4px;">No to-dos for this date yet.</p>';
+        } else {
+          todos.forEach(function(t){
+            var pendingDelT = uiState.pendingDeleteTodoId === t.id;
+            editorHtml += '<div class="contact-row'+(t.done?' sent':'')+(t.urgent?' urgent':'')+'">';
+            editorHtml += '<input type="checkbox" class="sent-check" data-action="toggle-todo-done" data-date="'+key+'" data-todo="'+t.id+'" '+(t.done?'checked':'')+' aria-label="Mark to-do done" />';
+            editorHtml += '<span class="contact-name">'+escapeHtml(t.text)+'</span>';
+            editorHtml += '<button type="button" class="flag-btn'+(t.urgent?' active':'')+'" data-action="toggle-todo-urgent" data-date="'+key+'" data-todo="'+t.id+'" title="Mark urgent" aria-label="Toggle urgent">\uD83D\uDEA9</button>';
+            editorHtml += '<button type="button" class="icon-btn" data-action="request-delete-todo" data-date="'+key+'" data-todo="'+t.id+'">'+(pendingDelT?'Tap again':'Remove')+'</button>';
+            editorHtml += '</div>';
+          });
+        }
+        editorHtml += '</div>';
+        editorHtml += '<form class="add-member-form" data-action="add-todo" data-date="'+key+'" style="margin:10px 0 18px;">';
+        editorHtml += '<input type="text" name="todoText" placeholder="Add a to-do" style="flex:1 1 100%;" required />';
+        editorHtml += '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);">';
+        editorHtml += '<input type="checkbox" name="todoUrgent" style="width:auto;" /> \uD83D\uDEA9 Urgent</label>';
+        editorHtml += '<button type="submit">Add</button>';
+        editorHtml += '</form>';
+
+        // --- Section 2: Notes ---
+        editorHtml += '<label class="field-label" for="cal-note-'+key+'">Notes</label>';
+        editorHtml += '<textarea id="cal-note-'+key+'" rows="4" data-action="edit-calendar-note" data-date="'+key+'" placeholder="Add a note for this date">'+escapeHtml(entry.note)+'</textarea>';
+
+        // --- Section 3: Alarm ---
+        editorHtml += '<label class="field-label" for="cal-alarm-'+key+'">Alarm</label>';
+        editorHtml += '<input type="time" id="cal-alarm-'+key+'" data-action="edit-calendar-alarm" data-date="'+key+'" value="'+escapeHtml(entry.alarm)+'" />';
+        editorHtml += '<p class="hint-text">The alarm fires as a notification while this app is open on the day of the reminder. It can\'t wake a closed app.</p>';
+
+        editorHtml += '<button type="button" class="link-btn danger" style="margin-top:10px;" data-action="clear-calendar-entry" data-date="'+key+'">Clear notes &amp; alarm</button>';
+        editorHtml += '</div>';
       }
     }
 
-    return html;
-  }
-
-  function renderTodoTab(){
-    var html = '';
-    html += '<h2 class="section-title">To-Do Lists</h2>';
-
-    if(todoState.lists.length === 0){
-      html += '<p class="empty-state">No lists yet. Add one below to get started.</p>';
+    // On mobile/the app, .calendar-detail and its placeholder are invisible
+    // (see .calendar-day-placeholder{ display:none } in the base stylesheet)
+    // so this wrapper adds no visual change there -- it only becomes a real
+    // second column, with a placeholder when nothing is selected, on desktop.
+    html += '<div class="calendar-detail">';
+    if(showEditor){
+      html += editorHtml;
     } else {
-      html += '<ul class="group-list">';
-      todoState.lists.forEach(function(list){
-        var expanded = uiState.expandedListId === list.id;
-        var total = list.notes.length;
-        var doneCount = list.notes.filter(function(n){ return n.done; }).length;
-
-        html += '<li class="group-row">';
-        html += '<button type="button" class="group-head" data-action="toggle-todolist" data-id="'+list.id+'">';
-        html += '<span class="chevron'+(expanded?' open':'')+'">&#8250;</span>';
-        html += '<span class="group-name">'+escapeHtml(list.name)+(list.urgent?' <span class="list-flag" title="Urgent list">\uD83D\uDEA9</span>':'')+'</span>';
-        html += '<span class="group-count">'+total+' '+(total===1?'note':'notes')+(total>0?'<br>'+doneCount+'/'+total+' done':'')+'</span>';
-        html += '</button>';
-
-        if(expanded){
-          html += '<div class="group-panel">';
-          html += '<div class="panel-manage">';
-          if(uiState.renamingListId === list.id){
-            html += '<form class="rename-form" data-action="confirm-rename-list" data-id="'+list.id+'">';
-            html += '<input type="text" name="rename" value="'+escapeHtml(list.name)+'" />';
-            html += '<button type="submit">Save</button></form>';
-          } else {
-            html += '<button type="button" class="link-btn" data-action="start-rename-list" data-id="'+list.id+'">Rename</button>';
-          }
-          html += '<button type="button" class="link-btn" data-action="toggle-list-urgent" data-id="'+list.id+'">'+(list.urgent?'\uD83D\uDEA9 Urgent':'Mark urgent')+'</button>';
-          var pendingDelL = uiState.pendingDeleteListId === list.id;
-          html += '<button type="button" class="link-btn danger" data-action="request-delete-list" data-id="'+list.id+'">'+
-            (pendingDelL ? 'Tap again to delete' : 'Delete list')+'</button>';
-          html += '</div>';
-
-          html += '<div class="contacts">';
-          if(total === 0){
-            html += '<p class="hint-text">No notes in this list yet.</p>';
-          } else {
-            list.notes.forEach(function(note){
-              var pendingDelN = uiState.pendingDeleteNoteId === note.id;
-              html += '<div class="contact-row'+(note.done?' sent':'')+(note.urgent?' urgent':'')+'">';
-              html += '<input type="checkbox" class="sent-check" data-action="toggle-note-done" data-list="'+list.id+'" data-note="'+note.id+'" '+(note.done?'checked':'')+' aria-label="Mark note done" />';
-              html += '<span class="contact-name">'+escapeHtml(note.text)+'</span>';
-              html += '<button type="button" class="flag-btn'+(note.urgent?' active':'')+'" data-action="toggle-note-urgent" data-list="'+list.id+'" data-note="'+note.id+'" title="Mark urgent" aria-label="Toggle urgent">\uD83D\uDEA9</button>';
-              html += '<button type="button" class="icon-btn" data-action="request-delete-note" data-list="'+list.id+'" data-note="'+note.id+'">'+(pendingDelN?'Tap again':'Remove')+'</button>';
-              html += '</div>';
-            });
-          }
-          html += '</div>';
-
-          html += '<form class="add-member-form" data-action="add-note" data-id="'+list.id+'" style="margin-top:14px;">';
-          html += '<input type="text" name="noteText" placeholder="Add a note" style="flex:1 1 100%;" required />';
-          html += '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);">';
-          html += '<input type="checkbox" name="noteUrgent" style="width:auto;" /> \uD83D\uDEA9 Urgent</label>';
-          html += '<button type="submit">Add note</button>';
-          html += '</form>';
-
-          html += '</div>';
-        }
-        html += '</li>';
-      });
-      html += '</ul>';
+      html += '<div class="calendar-day-placeholder"><p>Select a date to see its to-dos, notes, and alarm.</p></div>';
     }
-
-    html += '<div class="add-card"><h3>Add a list</h3>';
-    html += '<form data-action="add-todolist">';
-    html += '<input type="text" id="newListName" placeholder="e.g. Groceries" required />';
-    html += '<button type="submit">Add list</button>';
-    html += '</form></div>';
+    html += '</div>'; // .calendar-detail
+    html += '</div>'; // .calendar-columns
 
     return html;
   }
@@ -1076,14 +1117,6 @@
       if(pendingDeleteGroupTimeout){ clearTimeout(pendingDeleteGroupTimeout); pendingDeleteGroupTimeout = null; }
     }
   }
-  function collapseListTransient(exceptId){
-    if(uiState.renamingListId && uiState.renamingListId !== exceptId) uiState.renamingListId = null;
-    if(uiState.pendingDeleteListId && uiState.pendingDeleteListId !== exceptId){
-      uiState.pendingDeleteListId = null;
-      if(pendingDeleteListTimeout){ clearTimeout(pendingDeleteListTimeout); pendingDeleteListTimeout = null; }
-    }
-  }
-
   var app = document.getElementById('app');
 
   app.addEventListener('click', function(e){
@@ -1201,14 +1234,13 @@
         peopleState = { people: [] };
         groupsState = { groups: [] };
         calendarState = { entries: {} };
-        todoState = { lists: [] };
         uiState.expandedPersonId = null; uiState.editingPersonId = null; uiState.pendingDeletePersonId = null;
         uiState.expandedGroupId = null; uiState.renamingGroupId = null; uiState.pendingDeleteGroupId = null;
         uiState.pendingClearAll = false; uiState.copiedGroupId = null;
         uiState.calMonth = CURRENT_MONTH; uiState.calExpandedDate = null; uiState.calYear = CURRENT_YEAR;
-        uiState.expandedListId = null; uiState.renamingListId = null; uiState.pendingDeleteListId = null; uiState.pendingDeleteNoteId = null;
+        uiState.pendingDeleteTodoId = null;
         if(pendingClearTimeout){ clearTimeout(pendingClearTimeout); pendingClearTimeout = null; }
-        savePeople(); saveGroups(); saveCalendar(); saveTodo(); render();
+        savePeople(); saveGroups(); saveCalendar(); render();
       } else {
         uiState.pendingClearAll = true;
         if(pendingClearTimeout) clearTimeout(pendingClearTimeout);
@@ -1251,55 +1283,36 @@
     }
     else if(action === 'clear-calendar-entry'){
       var ckey = el.dataset.date;
-      delete calendarState.entries[ckey];
+      var entryToClear = calendarState.entries[ckey];
+      if(entryToClear){
+        entryToClear.note = '';
+        entryToClear.alarm = '';
+        if(!entryToClear.todos || entryToClear.todos.length === 0){
+          delete calendarState.entries[ckey];
+        }
+      }
       saveCalendar(); scheduleTodaysAlarms(); render();
     }
-    // --- To-do actions ---
-    else if(action === 'toggle-todolist'){
-      uiState.expandedListId = (uiState.expandedListId === id) ? null : id;
-      collapseListTransient(null);
-      render();
+    // --- To-do actions (inside a calendar date panel) ---
+    else if(action === 'toggle-todo-urgent'){
+      var refsU = findCalTodo(el.dataset.date, el.dataset.todo);
+      if(refsU){ refsU.todo.urgent = !refsU.todo.urgent; saveCalendar(); render(); }
     }
-    else if(action === 'start-rename-list'){
-      uiState.renamingListId = id;
-      render();
-    }
-    else if(action === 'toggle-list-urgent'){
-      var tl = findTodoList(id);
-      if(tl){ tl.urgent = !tl.urgent; saveTodo(); render(); }
-    }
-    else if(action === 'request-delete-list'){
-      if(uiState.pendingDeleteListId === id){
-        todoState.lists = todoState.lists.filter(function(l){ return l.id !== id; });
-        if(uiState.expandedListId === id) uiState.expandedListId = null;
-        uiState.renamingListId = null;
-        uiState.pendingDeleteListId = null;
-        if(pendingDeleteListTimeout){ clearTimeout(pendingDeleteListTimeout); pendingDeleteListTimeout = null; }
-        saveTodo(); render();
+    else if(action === 'request-delete-todo'){
+      var todoIdDel = el.dataset.todo;
+      var dKeyDel = el.dataset.date;
+      if(uiState.pendingDeleteTodoId === todoIdDel){
+        var entryDel = calendarState.entries[dKeyDel];
+        if(entryDel && Array.isArray(entryDel.todos)){
+          entryDel.todos = entryDel.todos.filter(function(t){ return t.id !== todoIdDel; });
+        }
+        uiState.pendingDeleteTodoId = null;
+        if(pendingDeleteTodoTimeout){ clearTimeout(pendingDeleteTodoTimeout); pendingDeleteTodoTimeout = null; }
+        saveCalendar(); render();
       } else {
-        uiState.pendingDeleteListId = id;
-        if(pendingDeleteListTimeout) clearTimeout(pendingDeleteListTimeout);
-        pendingDeleteListTimeout = setTimeout(function(){ uiState.pendingDeleteListId = null; render(); }, 3000);
-        render();
-      }
-    }
-    else if(action === 'toggle-note-urgent'){
-      var refs1 = findTodoNoteRefs(el.dataset.list, el.dataset.note);
-      if(refs1){ refs1.note.urgent = !refs1.note.urgent; saveTodo(); render(); }
-    }
-    else if(action === 'request-delete-note'){
-      var noteId = el.dataset.note;
-      var listId = el.dataset.list;
-      if(uiState.pendingDeleteNoteId === noteId){
-        var listRef = findTodoList(listId);
-        if(listRef){ listRef.notes = listRef.notes.filter(function(n){ return n.id !== noteId; }); }
-        uiState.pendingDeleteNoteId = null;
-        if(pendingDeleteNoteTimeout){ clearTimeout(pendingDeleteNoteTimeout); pendingDeleteNoteTimeout = null; }
-        saveTodo(); render();
-      } else {
-        uiState.pendingDeleteNoteId = noteId;
-        if(pendingDeleteNoteTimeout) clearTimeout(pendingDeleteNoteTimeout);
-        pendingDeleteNoteTimeout = setTimeout(function(){ uiState.pendingDeleteNoteId = null; render(); }, 3000);
+        uiState.pendingDeleteTodoId = todoIdDel;
+        if(pendingDeleteTodoTimeout) clearTimeout(pendingDeleteTodoTimeout);
+        pendingDeleteTodoTimeout = setTimeout(function(){ uiState.pendingDeleteTodoId = null; render(); }, 3000);
         render();
       }
     }
@@ -1358,30 +1371,14 @@
         saveGroups(); render();
       }
     }
-    else if(action === 'add-todolist'){
-      var listNameInput = document.getElementById('newListName');
-      var listName = (listNameInput.value || '').trim();
-      if(!listName) return;
-      var newList = { id: genId('tlist'), name: listName, urgent: false, notes: [] };
-      todoState.lists.push(newList);
-      uiState.expandedListId = newList.id;
-      saveTodo(); render();
-    }
-    else if(action === 'confirm-rename-list'){
-      var tl2 = findTodoList(id);
-      var newListName = (form.elements.rename.value || '').trim();
-      if(tl2 && newListName){ tl2.name = newListName; }
-      uiState.renamingListId = null;
-      saveTodo(); render();
-    }
-    else if(action === 'add-note'){
-      var listForNote = findTodoList(id);
-      if(!listForNote) return;
-      var noteText = (form.elements.noteText.value || '').trim();
-      if(!noteText) return;
-      var isUrgent = !!form.elements.noteUrgent.checked;
-      listForNote.notes.push({ id: genId('note'), text: noteText, done: false, urgent: isUrgent });
-      saveTodo(); render();
+    else if(action === 'add-todo'){
+      var dKeyAdd = form.dataset.date;
+      var todoText = (form.elements.todoText.value || '').trim();
+      if(!todoText) return;
+      var isTodoUrgent = !!form.elements.todoUrgent.checked;
+      var entryAdd = ensureCalEntry(dKeyAdd);
+      entryAdd.todos.push({ id: genId('todo'), text: todoText, done: false, urgent: isTodoUrgent });
+      saveCalendar(); render();
     }
   });
 
@@ -1396,9 +1393,8 @@
     }
     else if(e.target.dataset && e.target.dataset.action === 'edit-calendar-note'){
       var dKey = e.target.dataset.date;
-      var entry = calendarState.entries[dKey] || { note: '', alarm: '' };
+      var entry = ensureCalEntry(dKey);
       entry.note = e.target.value;
-      calendarState.entries[dKey] = entry;
       saveCalendar(); render();
     }
   });
@@ -1432,26 +1428,28 @@
     }
     else if(e.target.matches && e.target.matches('input[type="time"]') && e.target.dataset.action === 'edit-calendar-alarm'){
       var dKey2 = e.target.dataset.date;
-      var entry2 = calendarState.entries[dKey2] || { note: '', alarm: '' };
+      var entry2 = ensureCalEntry(dKey2);
       entry2.alarm = e.target.value;
-      calendarState.entries[dKey2] = entry2;
       saveCalendar(); render();
       if('Notification' in window && Notification.permission === 'default'){
         Notification.requestPermission();
       }
       scheduleTodaysAlarms();
     }
-    else if(e.target.matches && e.target.matches('input[type="checkbox"]') && e.target.dataset.action === 'toggle-note-done'){
-      var refs2 = findTodoNoteRefs(e.target.dataset.list, e.target.dataset.note);
-      if(refs2){ refs2.note.done = e.target.checked; saveTodo(); render(); }
+    else if(e.target.matches && e.target.matches('input[type="checkbox"]') && e.target.dataset.action === 'toggle-todo-done'){
+      var refs2 = findCalTodo(e.target.dataset.date, e.target.dataset.todo);
+      if(refs2){ refs2.todo.done = e.target.checked; saveCalendar(); render(); }
     }
   });
 
-  Promise.all([loadPeople(), loadGroups(), loadCalendar(), loadTodo()]).then(function(results){
+  Promise.all([loadPeople(), loadGroups(), loadCalendar()]).then(function(results){
     peopleState = results[0];
     groupsState = results[1];
     calendarState = results[2];
-    todoState = results[3];
+    return migrateOldTodos(calendarState.entries).then(function(migrated){
+      if(migrated) return saveCalendar();
+    });
+  }).then(function(){
     render();
     scheduleTodaysAlarms();
   });
