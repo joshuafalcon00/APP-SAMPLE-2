@@ -416,24 +416,39 @@
      than this breakpoint, so its layout stays pixel-identical.
      =========================================================== */
   @media (min-width: 900px){
-    .page{ max-width: 960px; padding: 40px 56px 72px; }
-    .page-head .sub{ max-width: 52ch; }
-    .tab-bar{ max-width: 380px; margin: 18px auto 6px; }
+    .page{ max-width: 1160px; padding: 48px 64px 80px; }
+    .page-head h1{ font-size: 30px; }
+    .page-head .sub{ max-width: 60ch; font-size: 15px; }
+    .tab-bar{ max-width: 440px; margin: 22px auto 8px; }
+    .section-title{ font-size: 17px; }
+
+    textarea, input[type="text"], input[type="time"], input[type="email"], input[type="password"], select{
+      font-size: 15px; padding: 11px 12px;
+    }
+    .add-card, .person-panel, .group-panel{ padding: 22px; }
+    .primary-btn{ padding: 12px 20px; font-size: 15px; }
 
     /* Messages tab: Groups and People side by side instead of stacked */
-    .messages-columns{ display:grid; grid-template-columns: 1fr 1fr; gap: 0 40px; align-items:start; }
+    .messages-columns{ display:grid; grid-template-columns: 1fr 1fr; gap: 0 64px; align-items:start; }
     .messages-columns .section-title:first-of-type{ margin-top: 20px; }
 
     /* Calendar tab: month picker on the left, selected day's panel on the right */
-    .calendar-columns{ display:grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 0 32px; align-items:start; }
-    .calendar-picker{ max-width: 400px; }
+    .calendar-columns{ display:grid; grid-template-columns: minmax(340px, 480px) 1fr; gap: 0 48px; align-items:start; }
+    .calendar-picker{ max-width: 480px; }
     .calendar-editor{ margin-top: 0; }
     .calendar-day-placeholder{
       display:flex; align-items:center; justify-content:center; text-align:center;
-      min-height: 220px; color: var(--muted); font-size: 14px; max-width: 34ch; margin: 0 auto;
+      min-height: 260px; color: var(--muted); font-size: 15px; max-width: 40ch; margin: 0 auto;
       background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,.1);
-      padding: 24px;
+      padding: 32px;
     }
+  }
+
+  @media (min-width: 1300px){
+    .page{ max-width: 1320px; padding: 56px 80px 88px; }
+    .messages-columns{ gap: 0 80px; }
+    .calendar-columns{ grid-template-columns: minmax(380px, 520px) 1fr; gap: 0 56px; }
+    .calendar-picker{ max-width: 520px; }
   }
 
   /* Hover affordances for mouse/trackpad only -- never applied on a touch
