@@ -153,7 +153,7 @@
   .field-label{ display:block; font-size: 12.5px; color: var(--muted); margin: 12px 0 6px; }
   .field-label:first-of-type{ margin-top: 4px; }
 
-  textarea, input[type="text"], input[type="time"], select{
+  textarea, input[type="text"], input[type="time"], input[type="email"], input[type="password"], select{
     width:100%;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -326,6 +326,11 @@
   .flag-btn.active{ opacity:1; filter:none; }
   .contact-row.urgent{ border-left: 3px solid var(--danger); padding-left: 7px; margin-left: -10px; }
 
+  /* Auth screen */
+  .auth-wrap{ max-width: 420px; margin: 40px auto 0; }
+  .auth-toggle{ display:flex; gap:14px; margin-top: 12px; }
+  .auth-toggle button{ flex:1; }
+
   /* ===========================================================
      Desktop layout
      Everything below only applies at wide viewport widths (an
@@ -374,57 +379,87 @@
   </header>
 
   <div id="banner"></div>
+  <div id="authScreen" style="display:none;"></div>
   <div id="app"></div>
 </div>
 
+<!-- Firebase (compat SDK -- keeps the same global-style API as the rest of this file) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
 <script>
 (function(){
-  // Standalone storage shim: this app was originally built to run inside
-  // Claude's Artifact sandbox, which injects a `window.storage` object backed
-  // by Anthropic's servers. That object does not exist in a normal browser,
-  // a hosted web page, or an Android WebView shell, so outside of Claude.ai
-  // every save/load call would fail. This shim reimplements the same
-  // get/set/delete/list interface on top of localStorage, which is available
-  // everywhere (including inside an Android WebView APK). If real
-  // window.storage IS present (i.e. you're still running this inside a
-  // Claude artifact), it's left alone and takes priority.
-  if (!window.storage) {
-    window.storage = {
-      get: function(key){
-        return new Promise(function(resolve, reject){
-          try{
-            var v = localStorage.getItem(key);
-            if(v === null){ resolve(null); return; }
-            resolve({ key: key, value: v, shared: false });
-          }catch(e){ reject(e); }
-        });
-      },
-      set: function(key, value){
-        return new Promise(function(resolve, reject){
-          try{
-            localStorage.setItem(key, value);
-            resolve({ key: key, value: value, shared: false });
-          }catch(e){ reject(e); }
-        });
-      },
-      delete: function(key){
-        return new Promise(function(resolve){
-          try{ localStorage.removeItem(key); }catch(e){}
+
+  // =========================================================
+  // FIREBASE SETUP
+  // Paste your own project's config here (Firebase console ->
+  // Project settings -> General -> Your apps -> SDK setup and
+  // configuration -> Config). Every device (phone app + desktop
+  // browser) must use this SAME config to see the same data.
+  // =========================================================
+  var firebaseConfig = {
+    apiKey: "AIzaSyBXuTX5ZlLlSk-DvDceAQp9rz33yaOjFrU",
+    authDomain: "mariel-s-app.firebaseapp.com",
+    databaseURL: "https://mariel-s-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "mariel-s-app",
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  var fbAuth = firebase.auth();
+  var fbDb = firebase.database();
+  var currentUid = null;
+
+  // ---------------------------------------------------------
+  // window.storage: now backed by Firebase Realtime Database,
+  // scoped under users/<uid>/<key> so each signed-in account
+  // only ever sees its own data, on any device.
+  // Falls back to localStorage ONLY if Firebase fails to load
+  // at all (e.g. no network), so the app doesn't hard-crash.
+  // ---------------------------------------------------------
+  var firebaseReady = (typeof firebase !== 'undefined');
+
+  function fbPath(key){ return 'users/' + currentUid + '/' + key; }
+
+  window.storage = {
+    get: function(key){
+      return new Promise(function(resolve, reject){
+        if(!firebaseReady || !currentUid){ reject(new Error('not signed in')); return; }
+        fbDb.ref(fbPath(key)).once('value').then(function(snap){
+          var val = snap.val();
+          if(val === null || val === undefined){ resolve(null); return; }
+          resolve({ key: key, value: val, shared: false });
+        }).catch(reject);
+      });
+    },
+    set: function(key, value){
+      return new Promise(function(resolve, reject){
+        if(!firebaseReady || !currentUid){ reject(new Error('not signed in')); return; }
+        fbDb.ref(fbPath(key)).set(value).then(function(){
+          resolve({ key: key, value: value, shared: false });
+        }).catch(reject);
+      });
+    },
+    delete: function(key){
+      return new Promise(function(resolve, reject){
+        if(!firebaseReady || !currentUid){ reject(new Error('not signed in')); return; }
+        fbDb.ref(fbPath(key)).remove().then(function(){
           resolve({ key: key, deleted: true, shared: false });
-        });
-      },
-      list: function(prefix){
-        return new Promise(function(resolve){
-          var keys = [];
-          for(var i=0;i<localStorage.length;i++){
-            var k = localStorage.key(i);
-            if(!prefix || k.indexOf(prefix) === 0) keys.push(k);
-          }
+        }).catch(reject);
+      });
+    },
+    list: function(prefix){
+      return new Promise(function(resolve, reject){
+        if(!firebaseReady || !currentUid){ reject(new Error('not signed in')); return; }
+        fbDb.ref('users/' + currentUid).once('value').then(function(snap){
+          var val = snap.val() || {};
+          var keys = Object.keys(val);
+          if(prefix) keys = keys.filter(function(k){ return k.indexOf(prefix) === 0; });
           resolve({ keys: keys, prefix: prefix, shared: false });
-        });
-      }
-    };
-  }
+        }).catch(reject);
+      });
+    }
+  };
 
   var STORAGE_PEOPLE_KEY = 'people-data-v2';
   var STORAGE_GROUPS_KEY = 'groups-data-v2';
@@ -459,6 +494,78 @@
   var quickCopiedTimeout = null;
   var quickMessageDraft = '';
   var alarmTimers = {}; // dateKey -> timeout id, for same-session alarm firing
+
+  // ---------------------------------------------------------
+  // Auth screen
+  // ---------------------------------------------------------
+  var authMode = 'signin'; // 'signin' | 'signup'
+  var authError = '';
+  var authBusy = false;
+
+  function renderAuthScreen(){
+    var el = document.getElementById('authScreen');
+    var html = '<div class="auth-wrap add-card">';
+    html += '<h3>' + (authMode === 'signin' ? 'Sign in' : 'Create your account') + '</h3>';
+    html += '<p class="hint-text" style="margin-top:0;">Sign in with the same email and password on every device to keep your people, groups, and calendar in sync.</p>';
+    html += '<form id="authForm">';
+    html += '<input type="email" id="authEmail" placeholder="Email" autocomplete="username" required />';
+    html += '<input type="password" id="authPassword" placeholder="Password (6+ characters)" autocomplete="' + (authMode === 'signin' ? 'current-password' : 'new-password') + '" minlength="6" required />';
+    html += '<button type="submit" class="primary-btn" ' + (authBusy ? 'disabled' : '') + '>' +
+      (authBusy ? 'Please wait...' : (authMode === 'signin' ? 'Sign in' : 'Create account')) + '</button>';
+    html += '</form>';
+    if(authError){ html += '<p class="hint-text" style="color:var(--danger);">' + escapeHtml(authError) + '</p>'; }
+    html += '<div class="auth-toggle">';
+    if(authMode === 'signin'){
+      html += '<button type="button" class="link-btn" id="authSwitchMode">First time? Create an account</button>';
+    } else {
+      html += '<button type="button" class="link-btn" id="authSwitchMode">Already have an account? Sign in</button>';
+    }
+    html += '</div></div>';
+    el.innerHTML = html;
+    el.style.display = 'block';
+    document.getElementById('app').style.display = 'none';
+
+    document.getElementById('authSwitchMode').addEventListener('click', function(){
+      authMode = (authMode === 'signin') ? 'signup' : 'signin';
+      authError = '';
+      renderAuthScreen();
+    });
+    document.getElementById('authForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      var email = document.getElementById('authEmail').value.trim();
+      var password = document.getElementById('authPassword').value;
+      authError = '';
+      authBusy = true;
+      renderAuthScreen();
+      var action = (authMode === 'signin')
+        ? fbAuth.signInWithEmailAndPassword(email, password)
+        : fbAuth.createUserWithEmailAndPassword(email, password);
+      action.catch(function(err){
+        authBusy = false;
+        authError = err && err.message ? err.message : 'Something went wrong. Try again.';
+        renderAuthScreen();
+      });
+      // On success, onAuthStateChanged below handles the transition.
+    });
+  }
+
+  function hideAuthScreen(){
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('authScreen').innerHTML = '';
+    document.getElementById('app').style.display = '';
+  }
+
+  fbAuth.onAuthStateChanged(function(user){
+    if(user){
+      currentUid = user.uid;
+      authBusy = false;
+      hideAuthScreen();
+      startApp();
+    } else {
+      currentUid = null;
+      renderAuthScreen();
+    }
+  });
 
   function genId(prefix){
     return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -977,8 +1084,12 @@
     html += '</div>'; // .messages-col (People)
     html += '</div>'; // .messages-columns
 
-    html += '<footer class="page-foot"><button type="button" class="link-btn danger" data-action="request-clear-all">'+
-      (uiState.pendingClearAll ? 'Tap again to erase everything' : 'Clear all data')+'</button></footer>';
+    html += '<footer class="page-foot">';
+    html += '<button type="button" class="link-btn danger" data-action="request-clear-all">'+
+      (uiState.pendingClearAll ? 'Tap again to erase everything' : 'Clear all data')+'</button>';
+    html += '<span style="margin:0 8px;color:var(--line);">&middot;</span>';
+    html += '<button type="button" class="link-btn" data-action="sign-out">Sign out</button>';
+    html += '</footer>';
 
     return html;
   }
@@ -1128,6 +1239,9 @@
     if(action === 'switch-tab'){
       uiState.activeTab = el.dataset.tab;
       render();
+    }
+    else if(action === 'sign-out'){
+      fbAuth.signOut();
     }
     else if(action === 'toggle-person'){
       uiState.expandedPersonId = (uiState.expandedPersonId === id) ? null : id;
@@ -1442,17 +1556,19 @@
     }
   });
 
-  Promise.all([loadPeople(), loadGroups(), loadCalendar()]).then(function(results){
-    peopleState = results[0];
-    groupsState = results[1];
-    calendarState = results[2];
-    return migrateOldTodos(calendarState.entries).then(function(migrated){
-      if(migrated) return saveCalendar();
+  function startApp(){
+    Promise.all([loadPeople(), loadGroups(), loadCalendar()]).then(function(results){
+      peopleState = results[0];
+      groupsState = results[1];
+      calendarState = results[2];
+      return migrateOldTodos(calendarState.entries).then(function(migrated){
+        if(migrated) return saveCalendar();
+      });
+    }).then(function(){
+      render();
+      scheduleTodaysAlarms();
     });
-  }).then(function(){
-    render();
-    scheduleTodaysAlarms();
-  });
+  }
 })();
 
 // Register the service worker so the app keeps working offline once it's
