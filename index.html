@@ -28,15 +28,44 @@
   }
   *{ box-sizing: border-box; }
   html,body{ margin:0; padding:0; }
+  html{
+    /* Depth: a soft rose glow drifting behind everything, instead of one flat
+       fill. Fixed to the viewport so it reads the same on a tall phone
+       screen and a wide desktop window. */
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(ellipse 620px 480px at 8% -6%, rgba(255, 214, 232, 0.85), transparent 60%),
+      radial-gradient(ellipse 700px 560px at 108% 8%, rgba(214, 51, 108, 0.16), transparent 62%),
+      radial-gradient(ellipse 640px 520px at -6% 62%, rgba(214, 51, 108, 0.14), transparent 60%),
+      radial-gradient(ellipse 760px 620px at 96% 100%, rgba(255, 214, 232, 0.75), transparent 58%),
+      linear-gradient(165deg, #FCEAF2 0%, #F8E3EC 45%, #F1D2E3 100%);
+    background-attachment: fixed;
+    background-size: cover;
+    min-height: 100%;
+  }
   body{
-    background: var(--paper);
+    position: relative;
     color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-size: 15px;
     line-height: 1.45;
     -webkit-tap-highlight-color: transparent;
+    min-height: 100vh;
   }
-  .page{ max-width: 480px; margin: 0 auto; padding: 22px 18px 40px; }
+  /* A drifting cherry-blossom motif, tiled and fixed behind all content.
+     Kept low-contrast so it reads as texture, not decoration competing
+     with the UI -- and it repeats seamlessly at any viewport size. */
+  body::before{
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='%23D6336C'%3E%3Cg transform='translate(48,54) rotate(12)' fill-opacity='0.16'%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(0)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(72)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(144)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(216)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(288)'/%3E%3Ccircle cx='0' cy='0' r='4.5' fill='%23F4C6DA' fill-opacity='0.5'/%3E%3C/g%3E%3Cg transform='translate(196,38) rotate(-18) scale(0.7)' fill-opacity='0.13'%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(72)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(144)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(216)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(288)'/%3E%3Ccircle cx='0' cy='0' r='4.5' fill='%23F4C6DA' fill-opacity='0.5'/%3E%3C/g%3E%3Cg transform='translate(120,168) rotate(30) scale(0.85)' fill-opacity='0.14'%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(72)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(144)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(216)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(288)'/%3E%3Ccircle cx='0' cy='0' r='4.5' fill='%23F4C6DA' fill-opacity='0.5'/%3E%3C/g%3E%3Cg transform='translate(226,206) rotate(-8) scale(0.55)' fill-opacity='0.12'%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(72)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(144)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(216)'/%3E%3Cellipse cx='0' cy='-16' rx='10' ry='16' transform='rotate(288)'/%3E%3Ccircle cx='0' cy='0' r='4.5' fill='%23F4C6DA' fill-opacity='0.5'/%3E%3C/g%3E%3Cellipse cx='24' cy='140' rx='7' ry='11' fill-opacity='0.15' transform='rotate(35 24 140)'/%3E%3Cellipse cx='168' cy='96' rx='7' ry='11' fill-opacity='0.15' transform='rotate(-25 168 96)'/%3E%3Cellipse cx='84' cy='224' rx='6' ry='10' fill-opacity='0.14' transform='rotate(60 84 224)'/%3E%3Cellipse cx='232' cy='128' rx='6' ry='10' fill-opacity='0.13' transform='rotate(-45 232 128)'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 260px 260px;
+  }
+  .page{ max-width: 480px; margin: 0 auto; padding: 22px 18px 40px; position: relative; }
 
   .page-head h1{
     font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
@@ -343,9 +372,7 @@
     cursor: pointer;
     font-size: 15px; line-height: 1;
     opacity: .5;
-    transition: opacity .15s ease, transform .15s ease;
   }
-  .love-heart-btn:hover, .love-heart-btn:focus-visible{ opacity: .8; transform: scale(1.06); }
   .love-heart-btn:active{ transform: scale(.94); }
 
   .love-overlay{
@@ -474,7 +501,7 @@
   <div id="authScreen" style="display:none;"></div>
   <div id="app"></div>
 
-  <button type="button" id="loveHeartBtn" class="love-heart-btn" aria-label="A little secret" title="For you, mahal">&#128153;</button>
+  <button type="button" id="loveHeartBtn" class="love-heart-btn" style="display:none;" aria-label="A little secret" title="For you, mahal">&#128153;</button>
 </div>
 
 <div id="loveOverlay" class="love-overlay" style="display:none;">
@@ -1092,6 +1119,12 @@
     }
 
     root.innerHTML = html;
+
+    // The secret heart button only belongs on the Messages tab.
+    var heartBtnEl = document.getElementById('loveHeartBtn');
+    if(heartBtnEl){
+      heartBtnEl.style.display = (uiState.activeTab === 'messages') ? '' : 'none';
+    }
 
     if(uiState.editingPersonId){
       var i1 = document.getElementById('pname-'+uiState.editingPersonId);
