@@ -594,6 +594,7 @@
   var fbAuth = firebase.auth();
   var fbDb = firebase.database();
   var currentUid = null;
+  var currentUserEmail = null; // set on sign-in; used to restrict the Google Sheet sync to one account
 
   // ---------------------------------------------------------
   // window.storage: now backed by Firebase Realtime Database,
@@ -657,6 +658,12 @@
   // Left as the placeholder below, syncTodoToSheet() further down just
   // no-ops -- nothing else in the app depends on this being set.
   var TODO_SHEET_WEBHOOK_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+  // Only to-dos added while signed in as THIS email get pushed to the
+  // Sheet -- useful since more than one Firebase account can sign into
+  // this app. Paste the exact sign-in email between the quotes. Left as
+  // the placeholder, syncTodoToSheet() below won't sync anyone yet.
+  var SYNC_ACCOUNT_EMAIL = 'PASTE_THE_ACCOUNT_EMAIL_TO_SYNC_HERE';
 
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -807,11 +814,13 @@
   fbAuth.onAuthStateChanged(function(user){
     if(user){
       currentUid = user.uid;
+      currentUserEmail = user.email || null;
       authBusy = false;
       hideAuthScreen();
       startApp();
     } else {
       currentUid = null;
+      currentUserEmail = null;
       renderAuthScreen();
     }
   });
@@ -902,6 +911,8 @@
   // Firebase above regardless of whether this sync succeeds.
   function syncTodoToSheet(dateStr, text, urgent){
     if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0) return;
+    if(!SYNC_ACCOUNT_EMAIL || SYNC_ACCOUNT_EMAIL.indexOf('PASTE_') === 0) return;
+    if(currentUserEmail !== SYNC_ACCOUNT_EMAIL) return;
     try{
       fetch(TODO_SHEET_WEBHOOK_URL, {
         method: 'POST',
