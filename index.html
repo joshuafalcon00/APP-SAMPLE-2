@@ -683,7 +683,9 @@
     expandedGroupId: null, renamingGroupId: null, pendingDeleteGroupId: null,
     pendingClearAll: false, copiedGroupId: null, quickCopied: false,
     calYear: CURRENT_YEAR, calMonth: CURRENT_MONTH, calExpandedDate: null,
-    pendingDeleteTodoId: null
+    pendingDeleteTodoId: null,
+    sheetSyncStatus: null, // null | 'syncing' | 'done' | 'empty'
+    sheetSyncCount: 0
   };
   var pendingDeletePersonTimeout = null;
   var pendingDeleteGroupTimeout = null;
@@ -920,6 +922,50 @@
         body: JSON.stringify({ date: dateStr, text: text, urgent: urgent })
       }).catch(function(){ /* best-effort sync; nothing for the user to see */ });
     }catch(e){ /* ignore */ }
+  }
+
+  // Manual "sync everything" action, wired to the button in the Calendar
+  // tab. Walks every date's to-dos (not just one) and posts each one via
+  // syncTodoToSheet -- so it also catches to-dos added before the sync was
+  // set up. Staggered 250ms apart so they don't all hit the Apps Script
+  // web app in the same instant. Safe to run more than once: re-sent
+  // to-dos just show up as duplicate rows in "Todos" (delete extras there
+  // if that happens).
+  function syncAllToSheet(){
+    if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0 ||
+       !SYNC_ACCOUNT_EMAIL || SYNC_ACCOUNT_EMAIL.indexOf('PASTE_') === 0){
+      showBanner('The Google Sheet URL and account email still need to be set up in the app file before this can sync.');
+      return;
+    }
+    if(currentUserEmail !== SYNC_ACCOUNT_EMAIL){
+      showBanner("You're signed in as a different account than the one set up to sync.");
+      return;
+    }
+
+    var count = 0;
+    Object.keys(calendarState.entries).forEach(function(dateStr){
+      var entry = calendarState.entries[dateStr];
+      (entry.todos || []).forEach(function(t){
+        setTimeout(function(){ syncTodoToSheet(dateStr, t.text, t.urgent); }, count * 250);
+        count++;
+      });
+    });
+
+    if(count === 0){
+      uiState.sheetSyncStatus = 'empty';
+      render();
+      setTimeout(function(){ uiState.sheetSyncStatus = null; render(); }, 2000);
+      return;
+    }
+
+    uiState.sheetSyncStatus = 'syncing';
+    uiState.sheetSyncCount = count;
+    render();
+    setTimeout(function(){
+      uiState.sheetSyncStatus = 'done';
+      render();
+      setTimeout(function(){ uiState.sheetSyncStatus = null; render(); }, 2200);
+    }, Math.max(500, count * 250 + 300));
   }
 
   function showBanner(message){
@@ -1397,6 +1443,12 @@
 
     html += '<div class="calendar-legend"><span><span class="legend-today"></span>Today</span><span><span class="legend-dot"></span>Has a note</span><span><span class="legend-todo-mark">&#10003;</span>Has to-dos</span></div>';
 
+    var syncLabel = 'Update Google Sheet';
+    if(uiState.sheetSyncStatus === 'syncing') syncLabel = 'Updating\u2026';
+    else if(uiState.sheetSyncStatus === 'done') syncLabel = 'Updated ' + uiState.sheetSyncCount + ' to-do' + (uiState.sheetSyncCount===1?'':'s');
+    else if(uiState.sheetSyncStatus === 'empty') syncLabel = 'No to-dos yet';
+    html += '<button type="button" class="link-btn" data-action="sync-to-sheet" '+(uiState.sheetSyncStatus==='syncing'?'disabled':'')+' style="margin:0 0 8px;">'+syncLabel+'</button>';
+
     html += '<div class="calendar-grid">';
     WEEKDAY_NAMES.forEach(function(wd){ html += '<div class="calendar-weekday">'+wd+'</div>'; });
 
@@ -1649,6 +1701,9 @@
       clearBanner();
     }
     // --- Calendar actions ---
+    else if(action === 'sync-to-sheet'){
+      syncAllToSheet();
+    }
     else if(action === 'exit-calendar'){
       uiState.activeTab = 'messages';
       uiState.calExpandedDate = null;
