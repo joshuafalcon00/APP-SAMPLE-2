@@ -651,6 +651,13 @@
   var STORAGE_CALENDAR_KEY = 'calendar-data-v1';
   var STORAGE_TODO_KEY = 'todo-data-v1';
 
+  // Google Sheet sync: paste the Web app URL you get from deploying the
+  // Apps Script (see Code.gs) here, between the quotes. Every new to-do
+  // is posted to this URL so it lands in the "Todos" tab automatically.
+  // Left as the placeholder below, syncTodoToSheet() further down just
+  // no-ops -- nothing else in the app depends on this being set.
+  var TODO_SHEET_WEBHOOK_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var WEEKDAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
@@ -885,6 +892,23 @@
         resolve();
       }catch(err){ reject(err); }
     });
+  }
+
+  // Fire-and-forget: posts a new to-do to the Google Sheet so it shows up
+  // in the "Todos" tab within a few seconds. Uses Content-Type: text/plain
+  // so the browser treats this as a "simple request" and skips a CORS
+  // preflight -- Apps Script web apps can't answer an OPTIONS preflight.
+  // Failures are swallowed on purpose: the to-do is already saved to
+  // Firebase above regardless of whether this sync succeeds.
+  function syncTodoToSheet(dateStr, text, urgent){
+    if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0) return;
+    try{
+      fetch(TODO_SHEET_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ date: dateStr, text: text, urgent: urgent })
+      }).catch(function(){ /* best-effort sync; nothing for the user to see */ });
+    }catch(e){ /* ignore */ }
   }
 
   function showBanner(message){
@@ -1740,6 +1764,7 @@
       var isTodoUrgent = !!form.elements.todoUrgent.checked;
       var entryAdd = ensureCalEntry(dKeyAdd);
       entryAdd.todos.push({ id: genId('todo'), text: todoText, done: false, urgent: isTodoUrgent });
+      syncTodoToSheet(dKeyAdd, todoText, isTodoUrgent);
       saveCalendar(); render();
     }
   });
