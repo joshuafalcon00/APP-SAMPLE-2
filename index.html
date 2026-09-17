@@ -653,16 +653,16 @@
   var STORAGE_TODO_KEY = 'todo-data-v1';
 
   // Google Sheet sync: paste the Web app URL you get from deploying the
-  // Apps Script (see Code.gs) here, between the quotes. Every new to-do
-  // is posted to this URL so it lands in the "Todos" tab automatically.
-  // Left as the placeholder below, syncTodoToSheet() further down just
-  // no-ops -- nothing else in the app depends on this being set.
+  // Apps Script (see Code.gs) here, between the quotes. Every to-do you
+  // add or check off is posted to this URL to keep the "Todos" tab in
+  // sync. Left as the placeholder below, syncTodoUpsert() further down
+  // just no-ops -- nothing else in the app depends on this being set.
   var TODO_SHEET_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbw6hs343GvlLibv4gc9bz8A7-fnGEB542YeMqopJ8_BEMdIABXXlWnDGWbkoroooEp8Kw/exec';
 
   // Only to-dos added while signed in as THIS email get pushed to the
   // Sheet -- useful since more than one Firebase account can sign into
   // this app. Paste the exact sign-in email between the quotes. Left as
-  // the placeholder, syncTodoToSheet() below won't sync anyone yet.
+  // the placeholder, syncTodoUpsert() below won't sync anyone yet.
   var SYNC_ACCOUNT_EMAIL = 'mariel.delapena@ccc.org.ph';
 
   var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -905,13 +905,15 @@
     });
   }
 
-  // Fire-and-forget: posts a new to-do to the Google Sheet so it shows up
-  // in the "Todos" tab within a few seconds. Uses Content-Type: text/plain
-  // so the browser treats this as a "simple request" and skips a CORS
-  // preflight -- Apps Script web apps can't answer an OPTIONS preflight.
-  // Failures are swallowed on purpose: the to-do is already saved to
-  // Firebase above regardless of whether this sync succeeds.
-  function syncTodoToSheet(dateStr, text, urgent){
+  // Fire-and-forget: upserts one to-do into the Google Sheet's "Todos" tab.
+  // Keyed by the to-do's own id, so this same call both creates the row
+  // the first time and updates its Done status/Date Finished every time
+  // after -- the Apps Script side decides which based on whether that id
+  // already exists. Content-Type: text/plain keeps this a "simple
+  // request" so the browser skips a CORS preflight, which Apps Script
+  // web apps can't answer. Failures are swallowed on purpose: the to-do
+  // is already saved to Firebase above regardless of whether this syncs.
+  function syncTodoUpsert(todoId, dateStr, text, done){
     if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0) return;
     if(!SYNC_ACCOUNT_EMAIL || SYNC_ACCOUNT_EMAIL.indexOf('PASTE_') === 0) return;
     if(currentUserEmail !== SYNC_ACCOUNT_EMAIL) return;
@@ -919,18 +921,18 @@
       fetch(TODO_SHEET_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ date: dateStr, text: text, urgent: urgent })
+        body: JSON.stringify({ id: todoId, date: dateStr, text: text, done: done })
       }).catch(function(){ /* best-effort sync; nothing for the user to see */ });
     }catch(e){ /* ignore */ }
   }
 
   // Manual "sync everything" action, wired to the button in the Calendar
-  // tab. Walks every date's to-dos (not just one) and posts each one via
-  // syncTodoToSheet -- so it also catches to-dos added before the sync was
-  // set up. Staggered 250ms apart so they don't all hit the Apps Script
-  // web app in the same instant. Safe to run more than once: re-sent
-  // to-dos just show up as duplicate rows in "Todos" (delete extras there
-  // if that happens).
+  // tab. Walks every date's to-dos (not just one) and upserts each one --
+  // so it also catches to-dos added or completed before the sync was set
+  // up, and pushes each one's real current Done status. Staggered 250ms
+  // apart so they don't all hit the Apps Script web app in the same
+  // instant. Safe to run more than once: since it's an upsert keyed by
+  // id, re-running it updates the same rows instead of duplicating them.
   function syncAllToSheet(){
     if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0 ||
        !SYNC_ACCOUNT_EMAIL || SYNC_ACCOUNT_EMAIL.indexOf('PASTE_') === 0){
@@ -943,10 +945,13 @@
     }
 
     var count = 0;
-    Object.keys(calendarState.entries).forEach(function(dateStr){
+    // Sorted chronologically (date-string keys sort correctly as-is) so
+    // months get created in the right order on the Sheet side, rather
+    // than in whatever order they happen to appear in local storage.
+    Object.keys(calendarState.entries).sort().forEach(function(dateStr){
       var entry = calendarState.entries[dateStr];
       (entry.todos || []).forEach(function(t){
-        setTimeout(function(){ syncTodoToSheet(dateStr, t.text, t.urgent); }, count * 250);
+        setTimeout(function(){ syncTodoUpsert(t.id, dateStr, t.text, t.done); }, count * 250);
         count++;
       });
     });
@@ -1829,8 +1834,9 @@
       if(!todoText) return;
       var isTodoUrgent = !!form.elements.todoUrgent.checked;
       var entryAdd = ensureCalEntry(dKeyAdd);
-      entryAdd.todos.push({ id: genId('todo'), text: todoText, done: false, urgent: isTodoUrgent });
-      syncTodoToSheet(dKeyAdd, todoText, isTodoUrgent);
+      var newTodoId = genId('todo');
+      entryAdd.todos.push({ id: newTodoId, text: todoText, done: false, urgent: isTodoUrgent });
+      syncTodoUpsert(newTodoId, dKeyAdd, todoText, false);
       saveCalendar(); render();
     }
   });
@@ -1891,7 +1897,11 @@
     }
     else if(e.target.matches && e.target.matches('input[type="checkbox"]') && e.target.dataset.action === 'toggle-todo-done'){
       var refs2 = findCalTodo(e.target.dataset.date, e.target.dataset.todo);
-      if(refs2){ refs2.todo.done = e.target.checked; saveCalendar(); render(); }
+      if(refs2){
+        refs2.todo.done = e.target.checked;
+        syncTodoUpsert(refs2.todo.id, e.target.dataset.date, refs2.todo.text, refs2.todo.done);
+        saveCalendar(); render();
+      }
     }
   });
 
