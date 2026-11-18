@@ -905,34 +905,11 @@
     });
   }
 
-  // Fire-and-forget: upserts one to-do into the Google Sheet's "Todos" tab.
-  // Keyed by the to-do's own id, so this same call both creates the row
-  // the first time and updates its Done status/Date Finished every time
-  // after -- the Apps Script side decides which based on whether that id
-  // already exists. Content-Type: text/plain keeps this a "simple
-  // request" so the browser skips a CORS preflight, which Apps Script
-  // web apps can't answer. Failures are swallowed on purpose: the to-do
-  // is already saved to Firebase above regardless of whether this syncs.
-  function syncTodoUpsert(todoId, dateStr, text, done){
-    if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0) return;
-    if(!SYNC_ACCOUNT_EMAIL || SYNC_ACCOUNT_EMAIL.indexOf('PASTE_') === 0) return;
-    if(currentUserEmail !== SYNC_ACCOUNT_EMAIL) return;
-    try{
-      fetch(TODO_SHEET_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ id: todoId, date: dateStr, text: text, done: done })
-      }).catch(function(){ /* best-effort sync; nothing for the user to see */ });
-    }catch(e){ /* ignore */ }
-  }
+  // Kept as a no-op so the add-to-do and checkbox handlers below can still
+  // call it. Syncing now happens only when the "Update Google Sheet"
+  // button is pressed.
+  function syncTodoUpsert(){ /* replaced by the Update Google Sheet button */ }
 
-  // Manual "sync everything" action, wired to the button in the Calendar
-  // tab. Walks every date's to-dos (not just one) and upserts each one --
-  // so it also catches to-dos added or completed before the sync was set
-  // up, and pushes each one's real current Done status. Staggered 250ms
-  // apart so they don't all hit the Apps Script web app in the same
-  // instant. Safe to run more than once: since it's an upsert keyed by
-  // id, re-running it updates the same rows instead of duplicating them.
   function syncAllToSheet(){
     if(!TODO_SHEET_WEBHOOK_URL || TODO_SHEET_WEBHOOK_URL.indexOf('PASTE_') === 0 ||
        !SYNC_ACCOUNT_EMAIL || SYNC_ACCOUNT_EMAIL.indexOf('PASTE_') === 0){
@@ -944,19 +921,19 @@
       return;
     }
 
-    var count = 0;
-    // Sorted chronologically (date-string keys sort correctly as-is) so
-    // months get created in the right order on the Sheet side, rather
-    // than in whatever order they happen to appear in local storage.
+    // One row per calendar note and one row per to-do, in date order.
+    var rows = [];
     Object.keys(calendarState.entries).sort().forEach(function(dateStr){
       var entry = calendarState.entries[dateStr];
+      if(entry.note && entry.note.trim()){
+        rows.push({ date: dateStr, text: entry.note.trim() });
+      }
       (entry.todos || []).forEach(function(t){
-        setTimeout(function(){ syncTodoUpsert(t.id, dateStr, t.text, t.done); }, count * 250);
-        count++;
+        rows.push({ date: dateStr, text: t.text + (t.done ? ' (done)' : '') });
       });
     });
 
-    if(count === 0){
+    if(rows.length === 0){
       uiState.sheetSyncStatus = 'empty';
       render();
       setTimeout(function(){ uiState.sheetSyncStatus = null; render(); }, 2000);
@@ -964,13 +941,23 @@
     }
 
     uiState.sheetSyncStatus = 'syncing';
-    uiState.sheetSyncCount = count;
+    uiState.sheetSyncCount = rows.length;
     render();
-    setTimeout(function(){
+
+    fetch(TODO_SHEET_WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ rows: rows })
+    }).then(function(){
       uiState.sheetSyncStatus = 'done';
       render();
       setTimeout(function(){ uiState.sheetSyncStatus = null; render(); }, 2200);
-    }, Math.max(500, count * 250 + 300));
+    }).catch(function(){
+      uiState.sheetSyncStatus = null;
+      showBanner("Couldn't reach the Google Sheet. Check your connection and try again.");
+      render();
+    });
   }
 
   function showBanner(message){
